@@ -1,0 +1,108 @@
+
+#################################
+##Australian Alien Flora Standardized System (AAFSS): a powerful tool to facilitate management and decision making on biological invasions and biosecurity.
+##Martín-Forés, I., Guerin, G.R., Lewis, D., Gallagher, R.V., Vilà, M., Catford, J., Pauchard, A. & Sparrow, B.
+##Supplementary material S3. R script associated with AAFSS.
+##This R script combines the Australian Plant Census (APC) with all the Australian state and main territory flora censuses in order to detect mismatches between species nomenclature and introduction status accross Australia. 
+##The script can be used with future releases of the APC or any of the state floras, to automatize this process in the future, as long as the format is the same for the source datasets. 
+##The script follows the APC taxonomy as the most recognised authority of taxonomic nomenclature for Australian flora, however it also incorporated standardised nomenclature from GBIF and WFO in order to adapt the tool to other international plant taxonomy sources. 
+##The introduction status recorded in the outcome is based on Blackburn et al. (2011). Species are therefore classified in the AAFSS as native, native colonising or native potentially colonising (when they were also introduced or potentially introduced, respectively within the same state or territory of origin), introduced, naturalised (when forming self-sustaining populations) – we also stated whether, for the two former ones, the status was doubtfully or formerly when that was the case –, harmful invasive (when recorded as invasive causing negative impacts according to the Australian Global Registry of Introduced and Invasive Species (GRIIS)), presumed extinct, or uncertain origin. 
+################################
+
+#####################
+#INTRUCTIONS
+#1. Download plant censuses from states and main territories, or request them to pertinent authorities:
+#Australian Plant Census (APC) = https://biodiversity.org.au/nsl/services/export/index
+
+#State and main territories plant censuses
+#Australian Capital Territory (ACT) = https://www.cpbr.gov.au/cpbr/ACT-census/vascular-gen-alpha.html
+#New South Wales (NSW) = request to the Royal Botanic Gardens, as it cannot be directly downloaded from electronic sources
+#Northern Territory (NT) = http://eflora.nt.gov.au/NTSpeciesList?heading=sNTSpecies
+#Queensland (QLD) = https://www.data.qld.gov.au/dataset/census-of-the-queensland-flora-and-fungi-2022/resource/548d9394-c94c-4512-a2fa-8f667dac2a2f
+#South Australia (SA) = https://data.environment.sa.gov.au/Content/Publications/vascular-plants-bdbsa-taxonomy.xlsx
+#Tasmania (TAS) = https://flora.tmag.tas.gov.au/resources/census/
+#Victoria (VIC) = https://vicflora.rbg.vic.gov.au/flora/download?q=*:*
+#Western Australia (WA) = request to the Western Australian Herbarium, as it cannot be directly downloaded from electronic sources
+
+#Australian Global Registry of Introduced and Invasive Species (GRIIS) = https://cloud.gbif.org/griis/resource?r=griis-australia&v=1.9#anchor-downloads
+
+#Once downloaded them, save them as follows in your working directory:
+#APC_original.csv
+#plant_census_ACT.csv
+#plant_census_NSW.csv
+#plant_census_NT.csv
+#plant_census_QLD.csv
+#plant_census_SA.csv
+#plant_census_TAS.csv
+#plant_census_VIC.csv
+#plant_census_WA.csv
+#griis.csv (taxon file)
+#invasive_griis.csv (speciesprofile file)
+#distribution_griis.csv (distribution file)
+
+#Download and save the R source file AAFSS_functions.R and AAFSS_secondary_functions.R to your working directory
+
+#2. Load the input census data files into your workspace as follows:
+APC_raw <- read.csv("APC_original.csv", header = TRUE, sep = ",", fileEncoding = "Latin1")
+ACT <- read.csv("plant_census_ACT.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+NSW <- read.csv("plant_census_NSW.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+NT <- read.csv("plant_census_NT.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+QLD <- read.csv("plant_census_QLD.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+SA <- read.csv("plant_census_SA.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+TAS <- read.csv("plant_census_TAS.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+VIC <- read.csv("plant_census_VIC.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+WA <- read.csv("plant_census_WA.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
+GRIIS <- read.csv("griis.csv", header = TRUE, sep = ",")
+invasive_griis <- read.csv("invasive_griis.csv", header = TRUE, sep = ",")
+distribution_griis <- read.csv("distribution_griis.csv", header = TRUE, sep = ",")
+
+#3. Load the source into your R workspace
+source('AAFSS_main_functions.R')
+source('AAFSS_secondary_functions.R')
+
+#4. Load required packages
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(stringr)
+library(rlang)
+library(syntaxr)
+library(WorldFlora)
+library(rgbif)
+library(DBI)
+library(datastructures)
+
+#Warning: for steps 5. and 6., if cross_WFO is selected as TRUE, then WFO needs to be downloaded using the next code line
+#WFO.download (WFO.url ="http://104.198.143.165/files/WFO_Backbone/_WFOCompleteBackbone/WFO_Backbone.zip", save.dir = getwd(), WFO.remember = TRUE)
+#5. Process the national APC data using the sourced function:
+APC_processed <- curate_apc(APC_raw, cross_GBIF = TRUE, cross_WFO = TRUE)
+
+#6. Process required state and territory data using sourced functions:
+ACT_processed <- curate_act(ACT, cross_GBIF = FALSE, cross_WFO = FALSE)
+NSW_processed <- curate_nsw(NSW, cross_GBIF = FALSE, cross_WFO = FALSE)
+NT_processed <- curate_nt(NT, cross_GBIF = FALSE, cross_WFO = FALSE)
+QLD_processed <- curate_qld(QLD, cross_GBIF = FALSE, cross_WFO = FALSE)
+SA_processed <- curate_sa(SA, cross_GBIF = FALSE, cross_WFO = FALSE)
+TAS_processed <- curate_tas(TAS, cross_GBIF = FALSE, cross_WFO = FALSE)
+VIC_processed <- curate_vic(VIC, cross_GBIF = FALSE, cross_WFO = FALSE)
+WA_processed <- curate_wa(WA, cross_GBIF = FALSE, cross_WFO = FALSE)
+GRIIS_processed <- curate_griis(GRIIS, invasive_griis, distribution_griis)
+
+#7. Match status between state/territory census and APC
+AAFSS_ACT_state_dataset <- match_act(APC_raw, APC_processed, ACT_processed)
+AAFSS_NSW_state_dataset <- match_nsw(APC_raw, APC_processed, NSW_processed)
+AAFSS_NT_state_dataset <- match_nt(APC_raw, APC_processed, NT_processed)
+AAFSS_QLD_state_dataset <- match_qld(APC_raw, APC_processed, QLD_processed)
+AAFSS_SA_state_dataset <- match_sa(APC_raw, APC_processed, SA_processed)
+AAFSS_TAS_state_dataset <- match_tas(APC_raw, APC_processed, TAS_processed)
+AAFSS_VIC_state_dataset <- match_vic(APC_raw, APC_processed, VIC_processed)
+AAFSS_WA_state_dataset <- match_wa(APC_raw, APC_processed, WA_processed)
+
+AAFSS_national_dataset <- national_alien_flora(APC_processed, AAFSS_ACT_state_dataset, AAFSS_NSW_state_dataset, AAFSS_NT_state_dataset, AAFSS_QLD_state_dataset, AAFSS_SA_state_dataset, AAFSS_TAS_state_dataset, AAFSS_VIC_state_dataset, AAFSS_WA_state_dataset, GRIIS_processed)
+
+#8. Fix manually pro-parte species by contrasting information with APC_raw
+
+##############################
+#END SCRIPT 1 APPENDIX (INSTRUCTIONS) HERE
+#############################
