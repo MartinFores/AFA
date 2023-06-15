@@ -19,7 +19,9 @@ Before proceeding to use this script, there are a few prior steps that need to b
    
 #Australian Plant Census (APC) = https://biodiversity.org.au/nsl/services/export/index
 
+
 #State and main territories plant censuses
+
 #Australian Capital Territory (ACT) = https://www.cpbr.gov.au/cpbr/ACT-census/vascular-gen-alpha.html
 
 #New South Wales (NSW) = request to the Royal Botanic Gardens, as it cannot be directly downloaded from electronic sources
