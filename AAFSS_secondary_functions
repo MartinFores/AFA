@@ -1,0 +1,551 @@
+#Source functions for AAFSS. Saved as AAFSS_secondary_functions.R
+
+#Function to create canonical name from variables provided on the ACT plant cesus
+canonical_name_for_ACT <- function(x) {
+  #if only genus, return NA
+  if(is.na(x[2])) {
+    return(NA)}
+  #if infraspecies is NA, then paste and collapse genus and species
+  if(is.na(x[3])) {
+    return(paste0(x[1:2], collapse = " "))}
+  #any other case, paste and collapse genus, species and infraspecies
+  else {
+    return(paste0(x[1:3], collapse = " "))}
+}
+
+#Function to create phrase species name
+phrasespNSW <- function(x) {
+  #if no phrase name, return NA
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(NA)}
+  #if phrase name, paste and collapse genus and phrase name
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = ""))}
+}
+
+#Function. Step 1 for creating canonical name
+canonical_name_NSW1 <- function(x) {
+  #if there is no infraspecies, return species name
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  #if there is infraspecies, paste and collapse
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = " "))}
+}
+
+#Function. Step 1 for creating canonical name
+canonical_name_TAS1 <- function(x) {
+  #if there is no infraspecies, return species name
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  #if there is infraspecies, paste and collapse
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = " "))}
+}
+
+#Function. Step 2 for creating canonical name
+canonical_name_NSW2 <- function(x) {
+  #if there is no hybrids, return the canonical name obtained in the previous step
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  #if there are hybrids, paste and collapse
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = ""))}
+}
+
+#Function. Step 2 for creating canonical name
+canonical_name_TAS2 <- function(x) {
+  #if there is no hybrids, return the canonical name obtained in the previous step
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  #if there are hybrids, paste and collapse
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = " "))}
+}
+
+#function to create canonical name from variables provided on the NT plant census
+canonical_name_from_scratch <- function(x) {
+  #if only genus, return NA
+  if(is.na(x[2])) {
+    return(NA)}
+  #if infraspecies rank is NA, then paste and collapse genus and species
+  if(is.na(x[3])) {
+    return(paste0(x[1:2], collapse = " "))}
+  #if there is intraspecies rank, then paste and collapse genus, species, infraspecies rank and infraspecies epithet
+  else {
+    return(paste0(x[1:4], collapse = " "))}
+} #close function
+
+
+#same function than before but including authorship to create state name for the NT
+state_name_from_scratch <- function(x) {
+  if(is.na(x[2])) {
+    return(NA)}
+  if(is.na(x[4])) {
+    return(paste0(x[1:3], collapse = " "))}
+  if(is.na(x[6])) {
+    return(paste0(x[1:5], collapse = " "))}
+  else {
+    return(paste0(x[1:6], collapse = " "))}
+} #close function
+
+#Function for TAS state name
+state_name <- function(x) {
+  #if accepted name is NA, keep full name
+  if(is.na(x[1])) {
+    return(paste0(x[2]))}
+  #if accepted name as a record, keep accepted name
+  else {
+    return(paste0(x[1]))}
+}
+
+TAS_extinct_status <- function(x) { 
+  # When extinct but with native origin, assign presumed extinct 
+  if(is.na(x[1])) {
+    return(paste0(x[2]))
+  }
+  if(x[1] == "presumed extinct" && x[2]== "native") {
+    return(paste0(x[1]))
+  }
+  # When extinct but with alien origin, assign formerly introduced
+  if(x[1] == "presumed extinct" && x[2]== "introduced") {
+    return(paste0("formerly introduced"))
+  }
+  # When extinct and uncertain origin, assign presumed extinct 
+  if(x[1] == "presumed extinct" && x[2]== "uncertain origin") {
+    return(paste0("presumed extinct"))
+  }
+  #for any other combination, paste status appearing in origin
+  else{
+    return(paste0(x[2]))}
+} #close function
+
+#function to assign correct status for extinct species, depending on their origin
+VIC_extinct_status <- function(x) { 
+  # When extinct but with native origin, assign presumed extinct 
+  if(x[1] == "extinct" && x[2]== "native") {
+    return(paste0("presumed extinct"))
+  }
+  # When extinct but with alien origin, assign formerly introduced
+  if(x[1] == "extinct" && x[2]== "introduced") {
+    return(paste0("formerly introduced"))
+  }
+  # When extinct and uncertain origin, assign presumed extinct 
+  if(x[1] == "extinct" && x[2]== "uncertain origin") {
+    return(paste0("presumed extinct"))
+  }
+  #for any other combination, paste status appearing in origin
+  else{
+    return(paste0(x[2]))}
+} #close function
+
+#Function. Step 1 for creating canonical name
+canonical_name_GRIIS1 <- function(x) {
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  if(!is.na(x[2])) {
+    return(paste0(x[1:2], collapse = " "))}
+}
+
+#Function. Step 2 for creating canonical name
+canonical_name_GRIIS2 <- function(x) {
+  #if there is no hybrids, return the canonical name obtained in the previous step
+  if(is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1]))}
+  #if there are hybrids, paste and collapse
+  if(!is.na(x[2])& !is.na(x[1])) {
+    return(paste0(x[1:2], collapse = " "))}
+}
+
+compare_status <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  if(is.na(x[2])) {
+    return("Not listed on the APC with the name appearing on the state flora or listed but not recorded as present in this state")
+  }
+  
+  if(is.na(x[1])) {
+    return("Status not assigned on the state flora")
+  }
+  
+  # When similar status in both columns --> write "Similar in state flora and APC"
+  if(x[1] == x[2]) {
+    return("Similar for the state flora and the APC")
+  }
+  # When differing --> write "According to the state flora is (copy --> State_Alien_Status), while according to the APC is (copy --> APC_Alien_Status)"
+  if(x[1] != x[2]) {
+    return(paste0("According to the state flora is ", x[1], ", while according to the APC is ", x[2]))
+  }
+}
+
+#function to return most conservative status
+state_conservative_status <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status, copy status from state census
+  if(x[3] == "Not listed on the APC with the name appearing on the state flora or listed but not recorded as present in this state") {
+    return(paste0(x[1]))
+  }
+  # When similar status in both columns, copy status from state census
+  if(x[3] == "Similar for the state flora and the APC") {
+    return(paste0(x[1]))
+  }
+  # When status not assign on state flora, copy status from the APC
+  if(x[3] == "Status not assigned on the state flora") {
+    return(paste0(x[2]))
+  }
+  # When differing but the status on state flora is the most conservative, copy status from the state census
+  if(x[3]  == "According to the state flora is native, while according to the APC is presumed extinct" || 
+     x[3]  == "According to the state flora is native potentially colonising, while according to the APC is native" ||
+     x[3]  == "According to the state flora is native potentially colonising, while according to the APC is presumed extinct" || 
+     x[3]  == "According to the state flora is native colonising, while according to the APC is native potentially colonising" || 
+     x[3]  == "According to the state flora is native colonising, while according to the APC is native" || 
+     x[3]  == "According to the state flora is native colonising, while according to the APC is presumed extinct" || 
+     x[3]  == "According to the state flora is uncertain origin, while according to the APC is native" || 
+     x[3]  == "According to the state flora is uncertain origin, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is uncertain origin, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is uncertain origin, while according to the APC is presumed extinct" ||
+     x[3]  == "According to the state flora is formerly introduced, while according to the APC is uncertain origin" ||
+     x[3]  == "According to the state flora is formerly introduced, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is formerly introduced, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is formerly introduced, while according to the APC is native" || 
+     x[3]  == "According to the state flora is formerly introduced, while according to the APC is presumed extinct" ||
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is formerly introduced" ||
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is uncertain origin" ||
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is native" || 
+     x[3]  == "According to the state flora is formerly naturalised, while according to the APC is presumed extinct" ||
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is formerly naturalised" || 
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is formerly introduced" || 
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is uncertain origin" ||
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is native" || 
+     x[3]  == "According to the state flora is doubtfully introduced, while according to the APC is presumed extinct" || 
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is introduced" ||
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is doubtfully introduced" || 
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is formerly naturalised" || 
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is formerly introduced" || 
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is uncertain origin" ||
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is native" || 
+     x[3]  == "According to the state flora is doubtfully naturalised, while according to the APC is presumed extinct" || 
+     x[3]  == "According to the state flora is introduced, while according to the APC is doubtfully introduced" ||     
+     x[3]  == "According to the state flora is introduced, while according to the APC is formerly naturalised" ||
+     x[3]  == "According to the state flora is introduced, while according to the APC is formerly introduced" ||
+     x[3]  == "According to the state flora is introduced, while according to the APC is uncertain origin" || 
+     x[3]  == "According to the state flora is introduced, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is introduced, while according to the APC is native potentially colonising"||
+     x[3]  == "According to the state flora is introduced, while according to the APC is native" || 
+     x[3]  == "According to the state flora is introduced, while according to the APC is presumed extinct" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is introduced" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is doubtfully naturalised" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is doubtfully introduced" || 
+     x[3]  == "According to the state flora is naturalised, while according to the APC is formerly naturalised" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is formerly introduced" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is native colonising" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is native potentially colonising" ||
+     x[3]  == "According to the state flora is naturalised, while according to the APC is native" || 
+     x[3]  == "According to the state flora is naturalised, while according to the APC is presumed extinct") {
+    return(paste0(x[1]))
+  }
+  # When differing but the status on the APC is the most conservative, copy status from the APC
+  if(x[3] == "Status not assigned in the state flora"   ||
+     x[3] == "According to the state flora is doubtfully naturalised, while according to the APC is naturalised"  ||
+     x[3] == "According to the state flora is introduced, while according to the APC is naturalised" || 
+     x[3] == "According to the state flora is introduced, while according to the APC is doubtfully naturalised"  || 
+     x[3] == "According to the state flora is doubtfully introduced, while according to the APC is naturalised"  || 
+     x[3] == "According to the state flora is doubtfully introduced, while according to the APC is introduced"  || 
+     x[3] == "According to the state flora is doubtfully introduced, while according to the APC is doubtfully naturalised"  || 
+     x[3] == "According to the state flora is formerly naturalised, while according to the APC is naturalised" || 
+     x[3] == "According to the state flora is formerly naturalised, while according to the APC is introduced" || 
+     x[3] == "According to the state flora is formerly naturalised, while according to the APC is doubtfully naturalised" ||      
+     x[3] == "According to the state flora is formerly naturalised, while according to the APC is doubtfully introduced" || 
+     x[3] == "According to the state flora is formerly introduced, while according to the APC is naturalised" || 
+     x[3] == "According to the state flora is formerly introduced, while according to the APC is introduced" || 
+     x[3] == "According to the state flora is formerly introduced, while according to the APC is doubtfully naturalised" || 
+     x[3] == "According to the state flora is formerly introduced, while according to the APC is doubtfully introduced" || 
+     x[3] == "According to the state flora is formerly introduced, while according to the APC is formerly naturalised" ||     
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is naturalised" ||
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is introduced" ||
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is doubtfully naturalised" || 
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is doubtfully introduced" || 
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is formerly naturalised" || 
+     x[3] == "According to the state flora is uncertain origin, while according to the APC is formerly introduced" || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is naturalised"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is introduced"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is doubtfully naturalised"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is doubtfully introduced"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is formerly naturalised"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is formerly introduced"   || 
+     x[3] == "According to the state flora is native colonising, while according to the APC is uncertain origin" || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is naturalised"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is introduced"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is doubtfully naturalised"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is doubtfully introduced"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is formerly naturalised"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is formerly introduced"   || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is uncertain origin" || 
+     x[3] == "According to the state flora is native potentially colonising, while according to the APC is native colonising"  || 
+     x[3] == "According to the state flora is native, while according to the APC is naturalised"   || 
+     x[3] == "According to the state flora is native, while according to the APC is introduced"   || 
+     x[3] == "According to the state flora is native, while according to the APC is doubtfully naturalised"   || 
+     x[3] == "According to the state flora is native, while according to the APC is doubtfully introduced"   || 
+     x[3] == "According to the state flora is native, while according to the APC is formerly naturalised"   || 
+     x[3] == "According to the state flora is native, while according to the APC is formerly introduced"   || 
+     x[3] == "According to the state flora is native, while according to the APC is uncertain origin" || 
+     x[3] == "According to the state flora is native, while according to the APC is native colonising" || 
+     x[3] == "According to the state flora is native, while according to the APC is native potentially colonising"  || 
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is naturalised" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is introduced" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is doubtfully naturalised" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is doubtfully introduced" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is formerly naturalised" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is formerly introduced" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is uncertain origin" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is native colonising" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is native potentially colonising" ||
+     x[3] == "According to the state flora is presumed extinct, while according to the APC is native") {
+    return(paste0(x[2]))
+  }
+}
+
+#function to assign equivalences of Darwin Core degree of establishment
+state_establishment_means <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  if(is.na(x[1])){
+    return(NA)
+  }
+  if(x[1] == "native"|| 
+     x[1] == "native colonising"|| 
+     x[1] == "native potentially colonising") {
+    return(paste0("native"))
+  }
+  if(x[1] == "uncertain origin") {
+    return(paste0("uncertain"))
+  }
+  if(x[1] == "naturalised"|| 
+     x[1] == "doubtfully naturalised"|| 
+     x[1] == "formerly naturalised"|| 
+     x[1] == "introduced"|| 
+     x[1] == "doubtfully introduced") {
+    return(paste0("introduced"))
+  }
+  # When differing but state flora is most conservative
+  if(x[1]  == "presumed extinct"|| 
+     x[1]  == "formerly introduced"){
+    return(paste0("not enough information to assign establishment means"))
+  }
+  if(x[1]  == "listed in APC but not recorded anywhere"|| 
+     x[1]  == "recorded only in external territories"){
+    return(NA)
+  }
+}
+
+#function to assign equivalences of Darwin Core degree of establishment at the state level
+state_degree_of_establishment <- function(x) { 
+  if(is.na(x[1])){
+    return(NA)
+  }
+  if(x[1] == "native"|| 
+     x[1] == "native colonising"|| 
+     x[1] == "native potentially colonising") {
+    return(paste0("native"))
+  }
+  if(x[1] == "uncertain origin") {
+    return(paste0("uncertain"))
+  }
+  if(x[1] == "naturalised"|| 
+     x[1] == "doubtfully naturalised"){
+    return(paste0("established"))
+  }
+  if(x[1] == "formerly naturalised"|| 
+     x[1] == "introduced"|| 
+     x[1] == "doubtfully introduced") {
+    return(paste0("not enough information to assign degree of establishment"))
+  }
+  # When differing but state flora is most conservative
+  if(x[1]  == "presumed extinct"|| 
+     x[1]  == "formerly introduced"){
+    return(paste0("not enough information to assign neither establishment means nor degree of establishment"))
+  }
+}
+
+#function to compare the status we elucidated at national scale with the one recorded on the GRIIS
+compare_status_GRIIS <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  if(is.na(x[2])) {
+    return("Not listed on the GRIIS with the name appearing on the APC or not recorded as introduced at the national scale")
+  }
+  if(is.na(x[1])) {
+    return("Not recorded in Australian states or main territories, only in external territories")
+  }
+  # When similar status in both columns --> write "Similar in state flora and APC"
+  if(x[1] == x[2]) {
+    return("Similar for the APC and the GRIIS")
+  }
+  # When differing --> write "According to the state flora is (copy --> State_Alien_Status), while according to the APC is (copy --> APC_Alien_Status)"
+  if(x[1] != x[2]) {
+    return(paste0("According to the APC is ", x[1], ", while according to the GRIIS is ", x[2]))
+  }
+}
+
+return_conservative_status_GRIIS <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  if(x[3] == "Not listed on the GRIIS with the name appearing on the APC or not recorded as introduced at national scale") {
+    return(paste0(x[1]))
+  }
+  # When similar status in both columns --> write "Similar in state flora and APC"
+  if(x[3] == "Not recorded in Australian states or main territories, only in external territories") {
+    return(NA)
+  }
+  
+  # When similar status in both columns --> write "Similar in state flora and APC"
+  if(x[3] == "Similar for the APC and the GRIIS") {
+    return(paste0(x[1]))
+  }
+  
+  # When differing and our national status is native, it states as native
+  if(x[3]  == "According to the APC is native, while according to the GRIIS is introduced" || 
+     x[3]  == "According to the APC is native colonising, while according to the GRIIS is introduced" ||
+     x[3]  == "According to the APC is native colonising potential, while according to the GRIIS is introduced"|| 
+     x[3]  == "According to the APC is uncertain origin, while according to the GRIIS is introduced" ||
+     x[3]  == "According to the APC is presumed extinct, while according to the GRIIS is introduced" || 
+     x[3]  == "According to the APC is native, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to the APC is native colonising, while according to the GRIIS is harmful invasive" ||
+     x[3]  == "According to the APC is native colonising potential, while according to GRIIS is harmful invasive"||
+     x[3]  == "According to the APC is presumed extinct, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to the APC is uncertain origin, while according to the GRIIS is harmful invasive") {
+    return(paste0(x[1]))
+  }
+  
+  if(x[3]  == "According to the APC is naturalised, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to the APC is formerly naturalised, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to the APC is introduced, while according to the GRIIS is harmful invasive" ||
+     x[3]  == "According to the APC is doubtfully naturalised, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to the APC is doubtfully introduced, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to the APC is formerly introduced, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to the APC is doubtfully introduced, while according to the GRIIS is introduced"|| 
+     x[3]  == "According to the APC is formerly introduced, while according to the GRIIS is introduced") {
+    return(paste0(x[2]))
+  }
+  # When differing but APC is most conservative
+  else {
+    return(paste0(x[1]))
+  }
+}
+
+national_establishment_means <- function(x) { #where x will be a row of the input df
+  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  if(is.na(x[1])){
+    return(NA)
+  }
+  if(x[1] == "native"|| 
+     x[1] == "native colonising"|| 
+     x[1] == "native potentially colonising" ||
+     x[1] == "Mismatch with GRIIS. native") {
+    return(paste0("native"))
+  }
+  if(x[1] == "uncertain origin") {
+    return(paste0("uncertain"))
+  }
+  if(x[1] == "naturalised"|| 
+     x[1] == "harmful invasive"|| 
+     x[1] == "doubtfully naturalised"|| 
+     x[1] == "formerly naturalised"|| 
+     x[1] == "introduced"|| 
+     x[1] == "doubtfully introduced") {
+    return(paste0("introduced"))
+  }
+  # When differing but state flora is most conservative
+  if(x[1]  == "presumed extinct"|| 
+     x[1]  == "formerly introduced"){
+    return(paste0("not enough information to assign establishment means"))
+  }
+  if(x[1]  == "listed in APC but not recorded anywhere"|| 
+     x[1]  == "recorded only in external territories"){
+    return(NA)
+  }
+}
+
+#function for equivalences with DC terminology degree of establishment for status at the national scale
+national_degree_of_establishment <- function(x) { 
+  if(is.na(x[1])){
+    return(NA)
+  }
+  if(x[1] == "native") {
+    return(paste0("native"))
+  }
+  if(x[1] == "uncertain") {
+    return(NA)
+  }
+  if(x[1] == introduced && x[2] == "naturalised"|| 
+     x[1] == introduced && x[2] == "doubtfully naturalised") {
+    return(paste0("established"))
+  }
+  if(x[1] == introduced && x[2] == "introduced"||  
+     x[1] == introduced && x[2] == "doubtfully introduced"||  
+     x[1] == introduced && x[2] == "formerly naturalised"||  
+     x[1] == introduced && x[2] == "formerly introduced"){
+    return(paste0("not enough information to assign degree of establishment"))
+  }
+  if(x[1]  == "not enough information to assign establishment means"){
+    return(paste0("not enough information to assign neither establishment means nor degree of establishment"))
+  }
+}
+
+###########CROSS APC TAXONOMY WITH GBIF AND WFO############
+cross_GBIF <- function(dataset) {
+  cat('Starting cross reference process with GBIF. This can take some time')
+  column_name <- colnames(dataset) [grep("canonical", colnames(dataset))]
+  data_name <- subset(dataset, select=column_name)
+   
+  #cross names with GBIF backbone without fuzzy matchign
+  GBIF <- name_backbone_checklist(data_name,verbose=FALSE)
+  
+  #match ACT's canonical name with GBIF's verbatim name (i.e. the original name that GBIF's matching function used)
+  match_taxonomy <- match(data_name[,1], GBIF$verbatim_name)
+  
+  #include on the main matrix both GBIF's canonical and scientific name based on matching
+  dataset$GBIF_canon_name <- GBIF$canonicalName[match_taxonomy]
+  dataset$GBIF_name <- GBIF$scientificName[match_taxonomy]
+  cat('Cross reference process with GBIF has now finished.')
+  return(dataset)
+}
+
+cross_WFO <- function(dataset) {
+  #download WFO
+  #WFO.download (WFO.url ="http://104.198.143.165/files/WFO_Backbone/_WFOCompleteBackbone/WFO_Backbone.zip", save.dir = getwd(), WFO.remember = TRUE)
+  
+  #remember WFO
+  WFO.remember(WFO.file = NULL, WFO.data = "WFO.data", WFO.pos = 1)
+  
+  column_name <- colnames(dataset) [grep("canonical", colnames(dataset))]
+  #match with WFO without fuzzy matching- and prioritising accepted species names
+  dataset1 <- WFO.match(spec.data= dataset, spec.name=column_name, WFO.data=WFO.data, Fuzzy=0, counter=1, verbose=FALSE)
+  dataset2 <- WFO.one(dataset1, priority = "Accepted")
+  
+  #select the columns from WFO matching that we are interested in
+  WFO <- subset(dataset2, select= c('scientificName', 'scientificNameAuthorship'))
+  
+  WFO$WFO_name <- paste(WFO$scientificName, WFO$scientificNameAuthorship)
+  WFO <- select(WFO, -scientificNameAuthorship)
+  dataset3 <- cbind(dataset, WFO)
+  
+  dataset3 <- rename(dataset3, WFO_canon_name=scientificName)
+  dataset3$WFO_name <- str_replace_all(dataset3$WFO_name, "NA NA", "")
+  dataset3$WFO_name[dataset3$WFO_name==""] <- NA
+  return(dataset3)
+}
+###################
+
+escape_curation_tasmania <- function(x) { 
+  if(x[1] == "Medicago sativa L. nothosubsp * varia (Martyn) Arcang."){
+    return(paste0("Medicago sativa nothosubsp * varia"))
+  }
+  if(x[1] == "Medicago sativa L. nothosubsp x varia (Martyn) Arcang.") {
+    return(paste0("Medicago sativa nothosubsp x varia"))
+  }
+  else{
+    return(paste0(x[2]))
+  }
+ }
