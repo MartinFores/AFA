@@ -12,6 +12,7 @@ The script follows the APC taxonomy as the most recognised authority of taxonomi
 The introduction status recorded in the outcome is based on Blackburn et al. (2011). Species are therefore classified in the AAFSS as native, native colonising or native potentially colonising (when they were also introduced or potentially introduced, respectively within the same state or territory of origin), introduced, naturalised (when forming self-sustaining populations) – we also stated whether, for the two former ones, the status was doubtfully or formerly when that was the case –, harmful invasive (when recorded as invasive causing negative impacts according to the Australian Globar Registry of Introduced and Invasive Species (GRIIS)), presumed extinct, or uncertain origin. 
 
 ################################
+
 Before proceeding to use this script, there are a few prior steps that need to be taken:
 
 1. Download plant censuses from states and main territories, or request them to pertinent authorities, and download the Australian Global Registry of Introduced and Invasive Species:
@@ -19,7 +20,6 @@ Before proceeding to use this script, there are a few prior steps that need to b
 #Australian Plant Census (APC) = https://biodiversity.org.au/nsl/services/export/index
 
 #State and main territories plant censuses
-
 #Australian Capital Territory (ACT) = https://www.cpbr.gov.au/cpbr/ACT-census/vascular-gen-alpha.html
 
 #New South Wales (NSW) = request to the Royal Botanic Gardens, as it cannot be directly downloaded from electronic sources
