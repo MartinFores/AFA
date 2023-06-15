@@ -1,0 +1,1826 @@
+#AAFSS_main_functions.R
+###############################################
+
+#source functions:
+
+############CURATE APC##################
+
+curate_apc <- function(APC_raw, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #select only the columns I want to work with
+  APC_raw <- subset(APC_raw, select = c('canonicalName',  'scientificName', 'acceptedNameUsage', 'scientificNameAuthorship', 'taxonRank', 'taxonomicStatus', 'taxonDistribution', 'taxonID'))
+  #change blanks for NA just in case
+  APC_raw <- replace(APC_raw, APC_raw=='', NA)
+  
+  #change APC names for the ones I want
+  names(APC_raw)[1] = "APC_all_canonical"
+  names(APC_raw)[2] = "APC_all_scientific"
+  names(APC_raw)[3] = "APC_accepted"
+  names(APC_raw)[4] = "authorship"
+  names(APC_raw)[5] = "rank"
+  names(APC_raw)[6] = "taxa_status"
+  names(APC_raw)[8] = "taxaID"
+  
+  #Subset to get rid of supra-orders that I don't want to include
+  APC_final_no_suprarank <- subset(APC_raw, rank!="Regnum")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Division")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Classis")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Subclassis")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Ordo")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Subordo")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Series")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Sectio")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Subsectio")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Subseries")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Familia")
+  APC_final_no_suprarank <- subset(APC_final_no_suprarank, rank!="Genus")
+  
+  names(APC_final_no_suprarank)
+  
+  #reorder so NA in distribution are last and can be deleted later when looking for duplicates
+  APC_reordered <- APC_final_no_suprarank[order(APC_final_no_suprarank[,c(7)],na.last=T),]
+  #remove duplicates of accepted name usage that have NA in distribution
+  APC_to_split <- APC_reordered[!duplicated(APC_reordered[,1]),]
+  #reorder again by accepted name
+  APC_to_split_reordered <- APC_to_split[order(APC_to_split[,c(1)]),]
+  
+  #remove records with NA in taxon distribution
+  APC_to_rename <- APC_to_split_reordered[!is.na(APC_to_split_reordered$taxonDistribution), ]
+  
+  #change names to what I want
+  names(APC_to_rename)
+  names(APC_to_rename)[3] = "APC_name"
+  names(APC_to_rename)[1] = "APC_canonical_name"
+  names(APC_to_rename)[4] = "Author"
+  
+  #####SPLIT DISTRIBUTION INFORMATION BY STATE AND MAIN TERRITORY ON APC#####
+  #remove column I don't need anymore
+  APC_split_distribution <- select(APC_to_rename, -APC_all_scientific)
+  
+  #dummy data frame with rows as species and a column for distribution listing states (commas separated) with naturalised status in parenthesis where not native
+  DFX <- APC_split_distribution
+  
+  #list all states included
+  states <- c("SA", "WA", "NSW", "Qld", "ACT", "NT", "Vic", "Tas", "AR", "CoI", "CaI", "ChI", "LHI", "NI", "HI", "CSI", "MDI")
+  
+  #create empty columns to receive codes for each state
+  DFX[ ,states] <- NA
+  
+  #iterate by species record
+  for(i in 1:nrow(DFX)) {
+    #split the distribution character string up by state
+    vec <- strsplit(as.character(DFX$taxonDistribution)[i], ",")[[1]]
+    #iterate by state
+    for(j in states) {
+      #locate current state
+      record <- vec[grep(j, vec)]
+      #assign as native or extract introduced code from parentheses
+      if(length(record) != 0) {
+        if(length(grep("(", record, fixed=T)) == 0) {
+          status <- "native"
+        } else {
+          status <- gsub("[\\(\\)]", "", regmatches(record, gregexpr("\\(.*?\\)", record))[1])
+        }
+        #change codes to preferred ones if needed
+        if(status == "native and naturalised") {status <- "native colonising"}
+        if(status == "native and naturalised and uncertain origin") {status <- "native colonising"}
+        if(status == "native and doubtfully naturalised") {status <- "native potentially colonising"}      
+        if(status == "native and uncertain origin") {status <- "native potentially colonising"}      
+        #paste codes back to relevant state column
+        DFX[i,j] <- status
+      } # close if
+    } # close for j
+  } #close for i
+  
+  #name dataset APC_raw_master_dataset as it is the main dataset in which everything else is going to be based 
+  APC_raw_master_dataset <- DFX
+  #remove taxonDistribution column as this info has already been integrated in the way we want
+  APC_raw_master_dataset <- select(APC_raw_master_dataset, - taxonDistribution)
+  #For simplicity, call it APC as a short to facilitate the script hereafter
+  APC <- APC_raw_master_dataset
+  
+  if(cross_GBIF){
+  APC <- cross_GBIF(dataset = APC)  
+  }
+  
+  if(cross_WFO){
+  APC <- cross_WFO(dataset = APC)  
+  }
+  
+  return(APC)
+} #end curate_apc function
+
+##################################################################################
+###########CURATE STATE AND MAIN TERRITORY PLANT CENSUSES###########
+
+#########################################
+####AUSTRALIAN CAPITAL TERRITORY########
+curate_act <- function(ACT, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #create new columns for territory (i.e. state for simplicity) canonical name and scientific name using the functions created
+  ACT$State_canonical_name <- apply(ACT[, c("GENUS", "SPECIES", "INFRASPECIES")], 1, canonical_name_for_ACT)
+  
+  #remove brackets and symbols from ORIGIN column
+  ACT$ORIGIN <- gsub('[', "", ACT$ORIGIN, fixed=TRUE)
+  ACT$ORIGIN <- gsub(']', "", ACT$ORIGIN, fixed=TRUE)
+  ACT$ORIGIN <- gsub('/', "", ACT$ORIGIN, fixed=TRUE)
+  #assign native when NA in ORIGIN column
+  ACT$ORIGIN[is.na(ACT$ORIGIN)] <- "native"
+  names(ACT)
+  #substitute codes for NATURALISED.STATUS with the ones proposed in AusAFW
+  ACT$NATURALISED.STATUS <- str_replace(ACT$NATURALISED.STATUS, "Doubtfully", "doubtfully naturalised")
+  ACT$NATURALISED.STATUS <- str_replace(ACT$NATURALISED.STATUS, "Formerly", "formerly naturalised")
+  
+  #create a column for alien status by combining the columns ORIGIN and NATURALISED.STATUS
+  ACT$State_Alien_Status <- ifelse(is.na(ACT$NATURALISED.STATUS), ACT$ORIGIN, ACT$NATURALISED.STATUS)
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  ACT$State_Alien_Status <- str_replace(ACT$State_Alien_Status, "Exotic Aust", "introduced")
+  ACT$State_Alien_Status <- str_replace(ACT$State_Alien_Status, "Exotic EA", "introduced")
+  ACT$State_Alien_Status <- str_replace(ACT$State_Alien_Status, "Indigenousintroduced", "native colonising")
+  ACT$State_Alien_Status <- str_replace(ACT$State_Alien_Status, "Uncertain", "uncertain origin")
+  
+  #Select the two variables of interest. For the ACT it was not possible to create State_name because authorship is not provided in the census
+  ACT <- subset(ACT, select = c('State_canonical_name', 'State_Alien_Status'))
+
+  #order by species name
+  ACT <- ACT[order(ACT$State_canonical_name), ]
+  #remove records for which species name is NA
+  ACT <- subset(ACT, !(is.na(State_canonical_name)))
+  #remove duplicates based on state name
+  ACT <- ACT[!duplicated(ACT$State_canonical_name),]
+  #ACT plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    ACT <- cross_GBIF(dataset = ACT)  
+  }
+  
+  if(cross_WFO){
+    ACT <- cross_WFO(dataset = ACT)  
+  }
+  
+  return(ACT)
+} #end curate_act function
+
+################################
+###NEW SOUTH WALES########
+curate_nsw <- function(NSW, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #Create a column for state name as mixing scientific name with current accepted names in the column accepted.name
+  NSW$State_name <- ifelse(is.na(NSW$accepted.name), NSW$scientific.name, NSW$accepted.name)
+  
+  #Canonical name is complicated, so we create it in steps. We do trials of names for different taxonomic levels
+  #Species level:
+  #paste and collapse the genus and species from state name
+  NSW$trialspp <- vapply(strsplit(NSW$State_name, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$trialspp <- str_replace_all(NSW$trialspp, "NA NA", "")
+  #replace blank by NA
+  NSW$trialspp[NSW$trialspp==""] <- NA
+  
+  #phrase species
+  #identify pattern and extract what is after
+  NSW$trialphrasesp <- str_extract(NSW$State_name, "[ ]sp[.]..*")
+  #remove symbols
+  NSW$trialphrasesp <- gsub("\\s*\\([^\\)]+\\)","",as.character(NSW$trialphrasesp))
+  #paste and collapse the second and third, to remove both, the space at the beginning and the author at the end
+  NSW$trialphrasesp <- vapply(strsplit(NSW$trialphrasesp, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$trialphrasesp <- str_replace_all(NSW$trialphrasesp, "NA NA", "")
+  #replace blank by NA
+  NSW$trialphrasesp[NSW$trialphrasesp==""] <- NA
+  
+  #Hybrids:
+  #identify pattern and extract what is after
+  NSW$trialhybrid <- str_extract(NSW$State_name, "[ ]x[ ]..*")
+  #paste and collapse the second and third, to remove both, the space at the beginning and the author at the end
+  NSW$trialhybrid2 <- vapply(strsplit(NSW$trialhybrid, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$trialhybrid2 <- str_replace_all(NSW$trialhybrid2, "NA NA", "")
+  #replace blank by NA
+  NSW$trialhybrid2[NSW$trialhybrid2==""] <- NA
+  
+  #Infraspecies level:
+  #Subsp.:
+  #First, extract the records that have "subsp" in their names
+  NSW$trialsubsp <- str_extract(NSW$State_name, "subsp\\..*")
+  #paste and collapse the first two words (i.e. subsp. + subsp. epithet)
+  NSW$subsp <- vapply(strsplit(NSW$trialsubsp, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$subsp <- str_replace_all(NSW$subsp, "NA NA", "")
+  #replace blank by NA
+  NSW$subsp[NSW$subsp==""] <- NA
+  
+  #Var.:
+  #First, extract the records that have "var" in their names
+  NSW$trialvar <- str_extract(NSW$State_name, "var\\..*")
+  #paste and collapse the first two words (i.e. var. + var. epithet)
+  NSW$var <- vapply(strsplit(NSW$trialvar, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$var <- str_replace_all(NSW$var, "NA NA", "")
+  #replace blank by NA
+  NSW$var[NSW$var==""] <- NA
+  
+  #Forma:
+  #First, extract the records that have space followed by f in their names
+  NSW$trialforma <- str_extract(NSW$State_name, "[ ]f\\..*")
+  #paste and collapse the second and third word, to remove both, the space at the beginning and the author at the end
+  NSW$forma <- vapply(strsplit(NSW$trialforma, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  NSW$forma <- str_replace_all(NSW$forma, "NA NA", "")
+  #replace blank by NA
+  NSW$forma[NSW$forma==""] <- NA
+  
+  #Extract only genus from State name once accepted names have been merged
+  NSW$genus_new <- vapply(strsplit(NSW$State_name, " "), \(x) paste0(x[1]), character(1L))
+  
+  #column with phrase species names
+  NSW$phrase <- apply(NSW[, c("genus_new", "trialphrasesp")], 1, phrasespNSW)
+  
+  #column for infraspecies ranks and epithets
+  # your new merged column. Start with subsp.
+  NSW$infrasp = NSW$subsp 
+  # merge with var
+  NSW$infrasp[!is.na(NSW$var)] = NSW$var[!is.na(NSW$var)]  
+  # merge with forma
+  NSW$infrasp[!is.na(NSW$forma)] = NSW$forma[!is.na(NSW$forma)]  
+  
+  #create a column as a step 1 for canonical name applying the previous function
+  NSW$trial_canonical_name <- apply(NSW[, c("trialspp", "infrasp")], 1, canonical_name_NSW1)
+  #create a column as a step 2 for canonical name applying the previous function
+  NSW$trial_canonical_name2 <- apply(NSW[, c("trial_canonical_name", "trialhybrid2")], 1, canonical_name_NSW2)
+  
+  #column for State_canonical_name
+  # your new merged column. Start with trial_canonical_name2
+  NSW$State_canonical_name = NSW$trial_canonical_name2  # your new merged column. Start with x
+  #merge with phrase species
+  NSW$State_canonical_name[!is.na(NSW$phrase)] = NSW$phrase[!is.na(NSW$phrase)]  # merge with y
+  #replace duplicated xx with just one (consequence of the process of split the names)
+  NSW$State_canonical_name <- str_replace_all(NSW$State_canonical_name, "xx", "x")
+   
+  #substitute codes for introduction with the ones proposed in AusAFW
+  NSW$natural.introduced <- gsub('N/I', "native colonising", NSW$natural.introduced, fixed=TRUE)
+  rep_strNSW = c('N'='native','I'='introduced')
+  #create a column for alien status
+  NSW$State_Alien_Status <- str_replace_all(NSW$natural.introduced, rep_strNSW)
+  
+  #reorder so NA in alien status are last and can be deleted later when looking for duplicates
+  NSW <- NSW[order(NSW$State_Alien_Status),]
+  #remove duplicates of state_name that have NA alien status
+  NSW <- NSW[!duplicated(NSW$State_name),]
+  
+  #select columns of interest
+  NSW <- subset(NSW, select = c('State_name','State_canonical_name', 'State_Alien_Status'))
+  
+  #order by state name
+  NSW <- NSW[order(NSW$State_name),]
+  #remove records for which state name is NA
+  NSW <- subset(NSW, !(is.na(State_name)))
+  #NSW plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    NSW <- cross_GBIF(dataset = NSW)  
+  }
+  
+  if(cross_WFO){
+    NSW <- cross_WFO(dataset = NSW)  
+  }
+  
+  return(NSW)
+} #end curate_nsw function
+
+######NORTHERN TERRITORY#######
+curate_nt <- function(NT, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #create new columns for territory (i.e. state for simplicity) canonical name and scientific name using the functions created
+  NT$State_canonical_name <- apply(NT[, c("Genus", "Species", "InfraSpecies.Rank", "Infra.Species.Name")], 1, canonical_name_from_scratch)
+  NT$State_name <- apply(NT[, c("Genus", "Species", "Species.Author.Name", "InfraSpecies.Rank", "Infra.Species.Name", "Infra.Species.Author.Name")], 1, state_name_from_scratch)
+  
+  #remove records for which state name is NA
+  NT <- subset(NT, !(is.na(State_name)))
+  
+  #remove brackets from Introduced.Status column
+  NT$Introduced.Status <- gsub('(', "", NT$Introduced.Status, fixed=TRUE)
+  NT$Introduced.Status <- gsub(')', "", NT$Introduced.Status, fixed=TRUE)
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  rep_strNT = c('Native to NT'='native','Formerly introduced to NT extinct'='formerly introduced','Introduced to NT'='introduced', 'Status uncertain in NT' = 'uncertain origin')
+  #create a column for alien status
+  NT$State_Alien_Status <- str_replace_all(NT$Introduced.Status, rep_strNT)
+  
+  #select the three variables of interest (i.e. scientific name, canonical name and introduction status)
+  NT <- subset(NT, select = c('State_name','State_canonical_name', 'State_Alien_Status'))
+  
+  #remove duplicates based on state name
+  NT <- NT[!duplicated(NT$State_name),]
+  #order by species name
+  NT <- NT[order(NT$State_name), ]
+  #NT plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    NT <- cross_GBIF(dataset = NT)  
+  }
+  
+  if(cross_WFO){
+    NT <- cross_WFO(dataset = NT)  
+  }
+  
+  return(NT)
+} #end curate_nt function
+
+######QUEENSLAND#########
+curate_qld <- function(QLD, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #Subset to select only kingfom plantae, and from it angiosperms, gymnosperms, and pteridophytes
+  QLD <- QLD[QLD$Kingdom == "Plantae",]
+  QLD <- QLD[QLD$Group_Name == "Angiosperms"|QLD$Group_Name == "Gymnosperms"|QLD$Group_Name == "Pteridophytes",]
+  
+  #rename columns
+  QLD <- rename(QLD, State_name = Botanical_Name)
+  QLD <- rename(QLD, State_canonical_name = Taxon_Name)
+ 
+  #remove records for which state name is NA
+  QLD <- subset(QLD, !(is.na(State_name)))
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  rep_strQLD = c('Native to QLD'='native', 'Native and naturalised in QLD'='native colonising','Formerly naturalised in QLD'='formerly naturalised', 'Doubtfully naturalised in QLD'='doubtfully naturalised', 'Naturalised in QLD'='naturalised')
+  #create a column for alien status
+  QLD$State_Alien_Status <- str_replace_all(QLD$Naturalisation_Status, rep_strQLD)
+  
+  #select the three variables of interest (i.e. scientific name, canonical name and introduction status)
+  QLD <- subset(QLD, select = c('State_name','State_canonical_name', 'State_Alien_Status'))
+  
+  #remove duplicates based on state name
+  QLD <- QLD[!duplicated(QLD$State_name),]
+  #order by species name
+  QLD <- QLD[order(QLD$State_canonical_name), ]
+  #QLD plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    QLD <- cross_GBIF(dataset = QLD)  
+  }
+  
+  if(cross_WFO){
+    QLD <- cross_WFO(dataset = QLD)  
+  }
+  
+  return(QLD)
+} #end curate_qld function
+
+######SOUTH AUSTRALIA#########
+curate_sa <- function(SA, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #rename columns of interest
+  SA <- rename(SA, State_canonical_name = SCIENTIFIC.NAME)
+  SA <- rename(SA, State_name = SPECIES.with.AUTHOR)
+  
+  SA <- subset(SA, SP!="sp.")
+  SA <- subset(SA, SP!="spp.")
+  
+  #add space after bracket for species name
+  SA$State_name <- str_replace(SA$State_name, "[)]", ") ")
+  #replace infraspecific rank in canonical name and in state name
+  SA$State_canonical_name <- str_replace(SA$State_canonical_name, "ssp.", "subsp.")
+  SA$State_name <- str_replace(SA$State_name, "ssp.", "subsp.")
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  #assign introduced when *
+  SA$INTRODUCED <- str_replace(SA$INTRODUCED, "[*]", "introduced")
+  #assign native when blank
+  SA$INTRODUCED[is.na(SA$INTRODUCED)] <- "native"
+  
+  #detect pattern 'xtinct' because sometimes is in capital letters and sometimes it's not
+  SA$extinct_true <- str_detect(SA$NPW.ACT.STATUS.COMMENT, "xtinct", negate = FALSE)
+  #assign NA if pattern not detected and presumed extinct if pattern detected
+  SA$extinct_true[SA$extinct_true=="FALSE"] <- NA
+  SA$extinct_true[SA$extinct_true=="TRUE"] <- "presumed extinct"
+  
+  #create column with alien status. It is not necessary to modify presumed extinct as there are no species of introduced origin flagged as presumed extinct
+  SA$State_Alien_Status <- ifelse(is.na(SA$extinct_true), SA$INTRODUCED, SA$extinct_true)
+  
+  #select the three variables of interest (i.e. scientific name, canonical name and introduction status)
+  SA <- subset(SA, select = c('State_name','State_canonical_name', 'State_Alien_Status'))
+  
+  #remove duplicates based on state name
+  SA <- SA[!duplicated(SA$State_name),]
+  #order by species name
+  SA <- SA[order(SA$State_name), ]
+  #SA plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    SA <- cross_GBIF(dataset = SA)  
+  }
+  
+  if(cross_WFO){
+    SA <- cross_WFO(dataset = SA)  
+  }
+  
+  return(SA)
+} #end curate_sa function
+
+#####TASMANIA########
+curate_tas <- function(TAS, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #remove equal symbol and space from ACCEPTED column and create a new column called Accepted_name
+  TAS$Accepted_name <- gsub('= ','',TAS$ACCEPTED)
+  
+  #Create column for state name at species level
+  TAS$State_name <- apply(TAS[, c("Accepted_name", "FULLNAME")], 1, state_name)
+  
+  #As for NSW, canonical name for Tasmania is complicated, so we create it in steps. We do trials of names for different taxonomic levels
+  #extract the genus from the state name after merging with accepted names
+  TAS$genus_new <- vapply(strsplit(TAS$State_name, " "), \(x) paste0(x[1]), character(1L))
+  #Species level:
+  #paste and collapse the genus and species from state name
+  TAS$trialspp <- vapply(strsplit(TAS$State_name, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  
+  #phrase species
+  #identify pattern and extract what is after
+  TAS$trialphrasesp <- str_extract(TAS$State_name, "[ ]sp[.]..*")
+  #remove symbols
+  TAS$trialphrasesp <- gsub("\\s*\\([^\\)]+\\)","",as.character(TAS$trialphrasesp))
+  #paste and collapse the second and third, to remove both, the space at the beginning and the author at the end
+  TAS$trialphrasesp <- vapply(strsplit(TAS$trialphrasesp, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  TAS$trialphrasesp <- str_replace_all(TAS$trialphrasesp, "NA NA", "")
+  #replace blank by NA
+  TAS$trialphrasesp[TAS$trialphrasesp==""] <- NA
+  
+  #Hybrids:
+  #identify pattern and extract what is after
+  TAS$trialhybrid <- str_extract(TAS$State_name, "[ ]x[ ]..*")
+  #paste and collapse the second and third, to remove both, the space at the beginning and the author at the end
+  TAS$trialhybrid2 <- vapply(strsplit(TAS$trialhybrid, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  TAS$trialhybrid2 <- str_replace_all(TAS$trialhybrid2, "NA NA", "")
+  #replace blank by NA
+  TAS$trialhybrid2[TAS$trialhybrid2==""] <- NA
+  
+  #Infraspecies level:
+  #Subsp.:
+  #First, extract the records that have "subsp" in their names
+  TAS$trialsubsp <- str_extract(TAS$State_name, "subsp\\..*")
+  #paste and collapse the first two words (i.e. subsp. + subsp. epithet)
+  TAS$subsp <- vapply(strsplit(TAS$trialsubsp, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  #replace NA NA by blank
+  TAS$subsp <- str_replace_all(TAS$subsp, "NA NA", "")
+  #replace blank by NA
+  TAS$subsp[TAS$subsp==""] <- NA
+  
+  #Var.:
+  #First, extract the records that have "var" in their names
+  TAS$trialvar <- str_extract(TAS$State_name, "var\\..*")
+  #paste and collapse the first two words (i.e. var. + var. epithet)
+  TAS$var <- vapply(strsplit(TAS$trialvar, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+  #replace NA NA by blank
+  TAS$var <- str_replace_all(TAS$var, "NA NA", "")
+  #replace blank by NA
+  TAS$var[TAS$var==""] <- NA
+  
+  #Forma:
+  #First, extract the records that have space followed by f in their names
+  TAS$trialforma <- str_extract(TAS$State_name, "[ ]f\\..*")
+  #paste and collapse the second and third word, to remove both, the space at the beginning and the author at the end
+  TAS$forma <- vapply(strsplit(TAS$trialforma, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+  #replace NA NA by blank
+  TAS$forma <- str_replace_all(TAS$forma, "NA NA", "")
+  #replace blank by NA
+  TAS$forma[TAS$forma==""] <- NA
+  
+  #column for infraspecies ranks and epithets
+  # your new merged column. Start with subsp.
+  TAS$infrasp = TAS$subsp  
+  # merge with var
+  TAS$infrasp[!is.na(TAS$var)] = TAS$var[!is.na(TAS$var)] 
+  # merge with forma
+  TAS$infrasp[!is.na(TAS$forma)] = TAS$forma[!is.na(TAS$forma)]  # merge with y
+  
+  #create a column as a step 1 for canonical name applying the previous function
+  TAS$trial_canonical_name <- apply(TAS[, c("trialspp", "infrasp")], 1, canonical_name_TAS1)
+  
+  #create a column as a step 2 for canonical name applying the previous function
+  TAS$trial_canonical_name2 <- apply(TAS[, c("trial_canonical_name", "trialhybrid2")], 1, canonical_name_TAS2)
+  
+  #column for State_canonical_name
+  # your new merged column. Start with trial_canonical_name2
+  TAS$State_canonical_name = TAS$trial_canonical_name2  # your new merged column. Start with x
+  #merge with phrase species
+  TAS$State_canonical_name[!is.na(TAS$phrase)] = TAS$phrase[!is.na(TAS$phrase)]  # merge with y
+  #replace duplicated xx with just one (consequence of the process of split the names)
+  TAS$State_canonical_name <- str_replace_all(TAS$State_canonical_name, "xx", "x")
+  
+  #replace two records that are nothosubsp. and escaped the curation process
+  TAS$State_canonical_name <- apply(TAS[, c("State_name", "State_canonical_name")], 1, escape_curation_tasmania)
+  
+  #in column extinct, remove ? symbols
+  TAS$EXTINCT <- gsub('?', "", TAS$EXTINCT, fixed=TRUE)
+  #in column extinct, replace x by presumed extinct
+  TAS$EXTINCT <- gsub('x','presumed extinct',TAS$EXTINCT)
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  rep_strTAS = c('[?]'='doubtfully ','i'='introduced')
+  #create a column for alien status
+  TAS$Introduction <- str_replace_all(TAS$INTRO, rep_strTAS)
+  #replace blanks by native
+  TAS$Introduction[is.na(TAS$Introduction)] = "native"
+  
+  #create column with extinct_status
+  TAS$extinct_status <- apply(TAS[, c("EXTINCT", "Introduction")], 1, TAS_extinct_status)
+  #create column for alien status by combining introduction status, origin, and occurrence. If introduction status is NA, keep record from recently created column extinct_status
+  TAS$State_Alien_Status <- ifelse(is.na(TAS$extinct_status), TAS$Introduction, TAS$extinct_status)
+  
+  #select columns of interest
+  TAS <- subset(TAS, select = c("State_name", "State_canonical_name", "State_Alien_Status"))
+  #order by state name
+  TAS <- TAS[order(TAS$State_name),]
+  #remove records for which state name is NA
+  TAS <- subset(TAS, !(is.na(State_name)))
+  #remove duplicates based on state name
+  TAS <- TAS[!duplicated(TAS$State_name),]
+  #TAS plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    TAS <- cross_GBIF(dataset = TAS)  
+  }
+  
+  if(cross_WFO){
+    TAS <- cross_WFO(dataset = TAS)  
+  }
+  
+  return(TAS)
+} #end curate_tas function
+
+####VICTORIA######
+curate_vic <- function(VIC, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #subset census to remove supra-rank orders
+  VIC <- subset(VIC, taxon_rank!="family")
+  VIC <- subset(VIC, taxon_rank!="phylum")
+  VIC <- subset(VIC, taxon_rank!="class")
+  VIC <- subset(VIC, taxon_rank!="order")
+  VIC <- subset(VIC, taxon_rank!="superorder")
+  VIC <- subset(VIC, taxon_rank!="genus")
+  VIC <- subset(VIC, taxon_rank!="section")
+  
+  #create a column for canonical name and fix names by merging species names with accepted names that have changed
+  VIC$State_canonical_name <- ifelse(is.na(VIC$accepted_name_usage), VIC$scientific_name, VIC$accepted_name_usage)
+  #create a column for authorship and fix authors by merging those from accepted names that have changed
+  VIC$authorship <- ifelse(is.na(VIC$accepted_name_usage_authorship), VIC$scientific_name_authorship, VIC$accepted_name_usage_authorship)
+  #create a column for state name (scientific name), by combining canonical name and author
+  VIC$State_name <- paste(VIC$State_canonical_name, VIC$authorship, sep =" ")
+  
+  #remove duplicate records of canonical name
+  VIC <- VIC[!duplicated(VIC$State_canonical_name),]
+  
+  #remove records appearing as excluded for occurrence status
+  VIC <- subset(VIC, occurrence_status!="excluded")
+  #substitute codes for occurrence status with the ones proposed in AusAFW
+  rep_strVIC1 = c('present'='','extinct'='extinct')
+  VIC$occurrence_status <- str_replace_all(VIC$occurrence_status, rep_strVIC1)
+  
+  #substitute codes for DC concepts - establishment means with the ones proposed in AusAFW
+  rep_strVIC2 = c('native'='native','introduced'='introduced', 'uncertain'='uncertain origin')
+  VIC$origin <- str_replace_all(VIC$establishment_means, rep_strVIC2)
+  
+  #substitute codes for DC concepts - degree of establishment with the ones proposed in AusAFW
+  rep_strVIC3 = c('casual'='','established'='naturalised','reproducing'='naturalised')
+  VIC$introduction_status <- str_replace_all(VIC$degree_of_establishment, rep_strVIC3)
+  VIC$introduction_status[VIC$introduction_status==""]<- NA
+  
+  #substitute codes for has_introduced_occurrences to identify native colonising
+  rep_strVIC4 = c('1'='native colonising')
+  VIC$has_introduced_occurrences <- str_replace_all(VIC$has_introduced_occurrences, rep_strVIC4)
+  
+  #create column with extinct_status
+  VIC$extinct_status <- apply(VIC[, c("occurrence_status", "origin")], 1, VIC_extinct_status)
+  #create column for alien status by combining introduction status, origin, and occurrence. If introduction status is NA, keep record from recently created column extinct_status
+  VIC$State_Alien_Status <- ifelse(is.na(VIC$introduction_status), VIC$extinct_status, VIC$introduction_status)
+  VIC$State_Alien_Status <- ifelse(!is.na(VIC$has_introduced_occurrences), VIC$has_introduced_occurrences, VIC$State_Alien_Status)
+  
+  #keeps the one we are interested in. We also keep here the DC concepts for establishment means and degree of establishment< as we will need them later.
+  VIC <- subset(VIC, select = c("State_name", "State_canonical_name", "State_Alien_Status", "establishment_means", "degree_of_establishment"))
+
+  #remove duplicates based on state name
+  VIC <- VIC[!duplicated(VIC$State_name),]
+  #VIC plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    VIC <- cross_GBIF(dataset = VIC)  
+  }
+  
+  if(cross_WFO){
+    VIC <- cross_WFO(dataset = VIC)  
+  }
+  
+  return(VIC)
+} #end curate_vic function
+
+###WESTERN AUSTRALIA#####
+curate_wa <- function(WA, cross_GBIF = FALSE, cross_WFO = FALSE) {
+  
+  #create a column for state name (scientific name), by combining canonical name and author
+  WA$State_name <- paste(WA$SPECIES_NAME, WA$AUTHOR, sep =" ")
+  #rename canonical name and introduction status
+  WA <- rename(WA, State_canonical_name = SPECIES_NAME)
+  WA <- rename(WA, State_Alien_Status = NATURALISED_STATUS)
+  
+  #select the three variables of interest (i.e. scientific name, canonical name and introduction status)
+  WA <- subset(WA, select = c("State_name", "State_canonical_name", "State_Alien_Status"))
+  
+  #substitute codes for introduction with the ones proposed in AusAFW
+  rep_strWA = c('N'='native','M'='native colonising','A'='naturalised')
+  #create a column for alien status
+  WA$State_Alien_Status <- str_replace_all(WA$State_Alien_Status, rep_strWA)
+  
+  #order by species name
+  WA <- WA[order(WA$State_name), ]
+  #remove records for which species name is NA
+  WA <- subset(WA, !(is.na(State_name)))
+  #remove duplicates based on state name
+  WA <- WA[!duplicated(WA$State_name),]
+  #WA plant census is now standardised and ready to be cross-referenced with AusAFW
+  
+  if(cross_GBIF){
+    WA <- cross_GBIF(dataset = WA)  
+  }
+  
+  if(cross_WFO){
+    WA <- cross_WFO(dataset = WA)  
+  }
+  
+  return(WA)
+} #end curate_wa function
+
+#######CURATE THE GRIIS DATASET######
+curate_griis <- function(GRIIS, invasive_griis,distribution_griis) {
+
+#combine datasets
+#create matching code based on id between GRIIS and invasive_griis
+m1_griis <- match(GRIIS$id, invasive_griis$id)
+#add invasive status to the GRIIS dataset
+GRIIS$Invasive_status <- invasive_griis$isInvasive[m1_griis]
+#add habitat to the GRIIS dataset
+GRIIS$Invasive_habitat <- invasive_griis$habitat[m1_griis]
+
+#create matching code based on id between GRIIS and distribution_griis
+m2_griis <- match(GRIIS$id, distribution_griis$id)
+#add country code to the GRIIS dataset
+GRIIS$countryCode <- distribution_griis$countryCode[m2_griis]
+#add occurrence status to the GRIIS dataset
+GRIIS$occurrenceStatus <- distribution_griis$occurrenceStatus[m2_griis]
+#add establishment means to the GRIIS dataset
+GRIIS$establishmentMeans <- distribution_griis$establishmentMeans[m2_griis]
+#add event date
+GRIIS$eventDate <- distribution_griis$eventDate[m2_griis]
+#now we have it all combined into one dataset
+
+#subset dataset to only contain plants
+GRIIS_plantae <- subset(GRIIS, kingdom="Plantae")
+#combined with current accepted names
+GRIIS_plantae$GRIIS_name <- ifelse(!is.na(GRIIS_plantae$acceptedNameUsage), GRIIS_plantae$scientificName, GRIIS_plantae$acceptedNameUsage)
+#remove duplicates based on species names
+GRIIS_plantae <- GRIIS_plantae[!duplicated(GRIIS_plantae$GRIIS_name),]
+
+#convert codes for introduction status according to the ones proposed in AusAFW. Notice that on the Australian GRIIS cryptogenic had been used as a synonym for uncertain, that's why we converted it to blank
+rep_strGRIIS= c('Alien'='introduced', 'Cryptogenic'='','Uncertain'='uncertain origin')
+#create column origin and replace establishment means with codes proposed
+GRIIS_plantae$Origin <- str_replace_all(GRIIS_plantae$establishmentMeans, rep_strGRIIS)
+#delete symbol
+GRIIS_plantae$Origin <- gsub('|', "", GRIIS_plantae$Origin, fixed=TRUE)
+#for invasive status, change 'Null' by blank
+GRIIS_plantae$Invasive_status <- gsub('Null', "", GRIIS_plantae$Invasive_status, fixed=TRUE)
+#for invasive status, substitute blank by NA
+GRIIS_plantae$Invasive_status[GRIIS_plantae$Invasive_status==""] <- NA
+#create column for GRIIS alien status by combining origin and invasive status
+GRIIS_plantae$GRIIS_Alien_Status = GRIIS_plantae$Origin  # your new merged column. Start with x
+GRIIS_plantae$GRIIS_Alien_Status[!is.na(GRIIS_plantae$Invasive_status)] = GRIIS_plantae$Invasive_status[!is.na(GRIIS_plantae$Invasive_status)]  # merge with y
+#change the term invasive to harmful invasive, as on the GRIIS, invasiveness was based on negative impact
+GRIIS_plantae$GRIIS_Alien_Status[GRIIS_plantae$GRIIS_Alien_Status=="Invasive"] <- "harmful invasive"
+
+#Curate the GRIIS database to create canonical name
+#Species level:
+#paste and collapse the genus and species from species name
+GRIIS_plantae$trialspp <- vapply(strsplit(GRIIS_plantae$GRIIS_name, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+#substitute NA NA by blank
+GRIIS_plantae$trialspp <- str_replace_all(GRIIS_plantae$trialspp, "NA NA", "")
+#substitute blank by NA
+GRIIS_plantae$trialspp[GRIIS_plantae$trialspp==""] <- NA
+
+#Hybrids:
+#identify pattern and extract what is after
+GRIIS_plantae$trialhybrid <- str_extract(GRIIS_plantae$GRIIS_name, "[ ]x[ ]..*")
+#paste and collapse the second and third, to remove both, the space at the beginning and the author at the end
+GRIIS_plantae$trialhybrid2 <- vapply(strsplit(GRIIS_plantae$trialhybrid, " "), \(x) paste0(x[2:3], collapse = " "), character(1L))
+#replace NA NA by blank
+GRIIS_plantae$trialhybrid2 <- str_replace_all(GRIIS_plantae$trialhybrid2, "NA NA", "")
+#replace blank by NA
+GRIIS_plantae$trialhybrid2[GRIIS_plantae$trialhybrid2==""] <- NA
+#no need to do phrase species because there are not any on the GRIIS
+
+#Infraspecies level:
+#Subsp.:
+#First, extract the records that have "subsp" in their names
+GRIIS_plantae$trialsubsp <- str_extract(GRIIS_plantae$GRIIS_name, "subsp\\..*")
+#paste and collapse the first and second words, to remove the author at the end
+GRIIS_plantae$subsp <- vapply(strsplit(GRIIS_plantae$trialsubsp, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+#substitute NA NA by blank
+GRIIS_plantae$subsp <- str_replace_all(GRIIS_plantae$subsp, "NA NA", "")
+#substitute blank by NA
+GRIIS_plantae$subsp[GRIIS_plantae$subsp==""] <- NA
+
+#Var.:
+#extract the records that have "var" in their names
+GRIIS_plantae$trialvar <- str_extract(GRIIS_plantae$GRIIS_name, "var\\..*")
+#paste and collapse the first and second words, to remove the author at the end
+GRIIS_plantae$var <- vapply(strsplit(GRIIS_plantae$trialvar, " "), \(x) paste0(x[1:2], collapse = " "), character(1L))
+#substitute NA NA by blank
+GRIIS_plantae$var <- str_replace_all(GRIIS_plantae$var, "NA NA", "")
+#substitute blank by NA
+GRIIS_plantae$var[GRIIS_plantae$var==""] <- NA
+#no need to do forma because there are not any on the GRIIS
+
+#column for infraspecies ranks and epithets
+# your new merged column. Start with subsp.
+GRIIS_plantae$infrasp = GRIIS_plantae$subsp  # your new merged column. Start with x
+# merge with var
+GRIIS_plantae$infrasp[!is.na(GRIIS_plantae$var)] = GRIIS_plantae$var[!is.na(GRIIS_plantae$var)]  # merge with y
+
+#create a column as a step 1 for canonical name applying the previous function
+GRIIS_plantae$trial_canonical_name1 <- apply(GRIIS_plantae[, c("trialspp", "infrasp")], 1, canonical_name_GRIIS1)
+
+#create a column as a step 2 for canonical name applying the previous function
+GRIIS_plantae$trial_canonical_name2 <- apply(GRIIS_plantae[, c("trial_canonical_name1", "trialhybrid2")], 1, canonical_name_GRIIS2)
+
+#add canonical name to the GRIIS dataset
+#replace duplicated xx with just one (consequence of the process of split the names)
+GRIIS_plantae$GRIIS_canonical_name <- str_replace_all(GRIIS_plantae$trial_canonical_name2, "xx", "x")
+
+return(GRIIS_plantae)
+} #end curate_griis function
+
+#####MATCH STATUSES BETWEEN STATE CENSUSES AND THE APC#########
+
+############################################
+
+match_act <- function(APC_raw, APC_processed, ACT_processed) {
+
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$canonicalName)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$scientificName)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$acceptedNameUsage)
+  
+  #convert species name on state censuses to lower case as well
+  ACT_processed$ACT_sp_name_lower  <- tolower(ACT_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_ACT <- match(ACT_processed$ACT_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  ACT_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_ACT] #extract matched name
+  ACT_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_ACT] #extract matched taxa status
+  
+  #match with original APC based on scientific name
+  m_ACT2 <- match(ACT_processed$ACT_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  ACT_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_ACT2] #extract matched name
+  ACT_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_ACT2] #extract matched taxa status
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_ACT3 <- match(ACT_processed$ACT_sp_name_lower,APC_raw$APC_accepted_lower)
+  ACT_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_ACT3] #extract matched name
+  ACT_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_ACT3] #extract matched taxa status
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_ACT4 <- match(ACT_processed$ACT_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  ACT_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_ACT4] #extract name
+  ACT_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_ACT4] #extract taxa status
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_ACT5 <- match(ACT_processed$ACT_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  ACT_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_ACT5] #extract name
+  ACT_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_ACT5] #extract taxa status
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_ACT6 <- match(ACT_processed$ACT_sp_name_lower,APC_accepted$APC_accepted_lower)
+  ACT_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_ACT6] #extract name
+  ACT_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_ACT6] #extract taxa status
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  ACT_processed$APC_name7 = ACT_processed$APC_name1  # merge first with canonical name
+  ACT_processed$APC_name7[!is.na(ACT_processed$APC_name2)] = ACT_processed$APC_name2[!is.na(ACT_processed$APC_name2)]  # now merge first with scientific name to prioritise these matches over the first ones
+  ACT_processed$APC_name7[!is.na(ACT_processed$APC_name3)] = ACT_processed$APC_name3[!is.na(ACT_processed$APC_name3)]  # finally merge with accepted name to prioritise these matches over all the former ones
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  ACT_processed$APC_name8 = ACT_processed$APC_name4  # your new merged column. Start with x
+  ACT_processed$APC_name8[!is.na(ACT_processed$APC_name5)] = ACT_processed$APC_name5[!is.na(ACT_processed$APC_name5)]  # merge with y
+  ACT_processed$APC_name8[!is.na(ACT_processed$APC_name6)] = ACT_processed$APC_name6[!is.na(ACT_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  ACT_processed$APC_name <- ACT_processed$APC_name7 #merge with x
+  ACT_processed$APC_name[!is.na(ACT_processed$APC_name8)] = ACT_processed$APC_name8[!is.na(ACT_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  ACT_processed$taxa_status7 = ACT_processed$taxa_status1  # merge first based on canonical name
+  ACT_processed$taxa_status7[!is.na(ACT_processed$taxa_status2)] = ACT_processed$taxa_status2[!is.na(ACT_processed$taxa_status2)]  # now merge first based on scientific name to prioritise these matches over the first ones
+  ACT_processed$taxa_status7[!is.na(ACT_processed$taxa_status3)] = ACT_processed$taxa_status3[!is.na(ACT_processed$taxa_status3)] # finally merge based on accepted name to prioritise these matches over the two former ones
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  ACT_processed$taxa_status8 = ACT_processed$taxa_status4  # merge first based on canonical name
+  ACT_processed$taxa_status8[!is.na(ACT_processed$taxa_status5)] = ACT_processed$taxa_status5[!is.na(ACT_processed$taxa_status5)]  # now merge first based on scientific name to prioritise these matches over the first ones
+  ACT_processed$taxa_status8[!is.na(ACT_processed$taxa_status6)] = ACT_processed$taxa_status6[!is.na(ACT_processed$taxa_status6)]  # finally merge based on accepted name to prioritise these matches over the two former ones
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  ACT_processed$taxa_status <- ACT_processed$taxa_status7 #merge with x
+  ACT_processed$taxa_status[!is.na(ACT_processed$taxa_status8)] = ACT_processed$taxa_status8[!is.na(ACT_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_ACTaccepted <- match(ACT_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  ACT_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_ACTaccepted]
+  #populate alien status from distribution in ACT column
+  ACT_processed$APC_Alien_Status <- APC_processed$ACT[m_ACTaccepted]
+  #populate authorship from ACT
+  ACT_processed$APC_Authorship <- APC_processed$Author[m_ACTaccepted]
+  
+  names(ACT_processed)
+  #select columns of interest
+  ACT_processed <- subset(ACT_processed, select = c("State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  
+  #status comparison between state censuses and APC
+  #ACT#
+  #add status comparison
+  ACT_processed$Status_comparison <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  ACT_processed$Most_conservative_status <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  ACTMost_conservative_status_df <- as.data.frame(ACT_processed[, c("Most_conservative_status")])
+  #add establishment_means
+  ACT_processed$establishment_means <- apply(ACTMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  ACT_processed$degree_of_establishment <- apply(ACTMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  ACT_processedb <- unnest(ACT_processed, establishment_means, keep_empty = TRUE)
+  ACT_processedc <- unnest(ACT_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  ACT_compared <- as.data.frame(ACT_processedc)
+  #save dataset for supplementary material
+  
+  return(ACT_compared)
+  cat('Dataset for the ACT is ready')
+} #end of match_ACT function
+
+############################################
+
+match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
+ 
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  NSW_processed$NSW_sp_name_lower  <- tolower(NSW_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_NSW <- match(NSW_processed$NSW_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  NSW_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_NSW]
+  NSW_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_NSW]
+  
+  #match with original APC based on scientific name
+  m_NSW2 <- match(NSW_processed$NSW_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  NSW_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_NSW2]
+  NSW_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_NSW2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_NSW3 <- match(NSW_processed$NSW_sp_name_lower,APC_raw$APC_accepted_lower)
+  NSW_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_NSW3]
+  NSW_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_NSW3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_NSW4 <- match(NSW_processed$NSW_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  NSW_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_NSW4]
+  NSW_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_NSW4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_NSW5 <- match(NSW_processed$NSW_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  NSW_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_NSW5]
+  NSW_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_NSW5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_NSW6 <- match(NSW_processed$NSW_sp_name_lower,APC_accepted$APC_accepted_lower)
+  NSW_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_NSW6]
+  NSW_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_NSW6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  NSW_processed$APC_name7 = NSW_processed$APC_name1  # your new merged column. Start with x
+  NSW_processed$APC_name7[!is.na(NSW_processed$APC_name2)] = NSW_processed$APC_name2[!is.na(NSW_processed$APC_name2)]  # merge with y
+  NSW_processed$APC_name7[!is.na(NSW_processed$APC_name3)] = NSW_processed$APC_name3[!is.na(NSW_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  NSW_processed$APC_name8 = NSW_processed$APC_name4  # your new merged column. Start with x
+  NSW_processed$APC_name8[!is.na(NSW_processed$APC_name5)] = NSW_processed$APC_name5[!is.na(NSW_processed$APC_name5)]  # merge with y
+  NSW_processed$APC_name8[!is.na(NSW_processed$APC_name6)] = NSW_processed$APC_name6[!is.na(NSW_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  NSW_processed$APC_name <- NSW_processed$APC_name7
+  NSW_processed$APC_name[!is.na(NSW_processed$APC_name8)] = NSW_processed$APC_name8[!is.na(NSW_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  NSW_processed$taxa_status7 = NSW_processed$taxa_status1  # your new merged column. Start with x
+  NSW_processed$taxa_status7[!is.na(NSW_processed$taxa_status2)] = NSW_processed$taxa_status2[!is.na(NSW_processed$taxa_status2)]  # merge with y
+  NSW_processed$taxa_status7[!is.na(NSW_processed$taxa_status3)] = NSW_processed$taxa_status3[!is.na(NSW_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  NSW_processed$taxa_status8 = NSW_processed$taxa_status4  # your new merged column. Start with x
+  NSW_processed$taxa_status8[!is.na(NSW_processed$taxa_status5)] = NSW_processed$taxa_status5[!is.na(NSW_processed$taxa_status5)]  # merge with y
+  NSW_processed$taxa_status8[!is.na(NSW_processed$taxa_status6)] = NSW_processed$taxa_status6[!is.na(NSW_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  NSW_processed$taxa_status <- NSW_processed$taxa_status7
+  NSW_processed$taxa_status[!is.na(NSW_processed$taxa_status8)] = NSW_processed$taxa_status8[!is.na(NSW_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_NSWaccepted <- match(NSW_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  NSW_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_NSWaccepted]
+  #populate alien status from distribution in ACT column
+  NSW_processed$APC_Alien_Status <- APC_processed$NSW[m_NSWaccepted]
+  #populate authorship from ACT
+  NSW_processed$APC_Authorship <- APC_processed$Author[m_NSWaccepted]
+  
+  #select columns of interest
+  NSW_processed <- subset(NSW_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+  
+  #add status comparison
+  NSW_processed$Status_comparison <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  NSW_processed$Most_conservative_status <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  Most_con <- unnest(NSW_processed, Most_conservative_status, keep_empty = TRUE)
+  NSW_processedb <- as.data.frame(Most_con)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  NSWMost_conservative_status_df <- as.data.frame(NSW_processedb[, c("Most_conservative_status")])
+  #add establishment_means
+  NSW_processedb$establishment_means <- apply(NSWMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  NSW_processedb$degree_of_establishment <- apply(NSWMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  NSW_processedc <- unnest(NSW_processedb, establishment_means, keep_empty = TRUE)
+  NSW_processedd <- unnest(NSW_processedc, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  NSW_compared <- as.data.frame(NSW_processedd)
+
+  return(NSW_compared)
+  cat('Dataset for NSW is ready')
+} #end of match_ACT function
+
+############################################
+
+match_nt <- function(APC_raw, APC_processed, NT_processed){
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  NT_processed$NT_sp_name_lower  <- tolower(NT_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_NT <- match(NT_processed$NT_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  NT_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_NT]
+  NT_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_NT]
+  
+  #match with original APC based on scientific name
+  m_NT2 <- match(NT_processed$NT_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  NT_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_NT2]
+  NT_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_NT2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_NT3 <- match(NT_processed$NT_sp_name_lower,APC_raw$APC_accepted_lower)
+  NT_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_NT3]
+  NT_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_NT3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_NT4 <- match(NT_processed$NT_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  NT_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_NT4]
+  NT_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_NT4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_NT5 <- match(NT_processed$NT_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  NT_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_NT5]
+  NT_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_NT5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_NT6 <- match(NT_processed$NT_sp_name_lower,APC_accepted$APC_accepted_lower)
+  NT_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_NT6]
+  NT_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_NT6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  NT_processed$APC_name7 = NT_processed$APC_name1  # your new merged column. Start with x
+  NT_processed$APC_name7[!is.na(NT_processed$APC_name2)] = NT_processed$APC_name2[!is.na(NT_processed$APC_name2)]  # merge with y
+  NT_processed$APC_name7[!is.na(NT_processed$APC_name3)] = NT_processed$APC_name3[!is.na(NT_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  NT_processed$APC_name8 = NT_processed$APC_name4  # your new merged column. Start with x
+  NT_processed$APC_name8[!is.na(NT_processed$APC_name5)] = NT_processed$APC_name5[!is.na(NT_processed$APC_name5)]  # merge with y
+  NT_processed$APC_name8[!is.na(NT_processed$APC_name6)] = NT_processed$APC_name6[!is.na(NT_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  NT_processed$APC_name <- NT_processed$APC_name7
+  NT_processed$APC_name[!is.na(NT_processed$APC_name8)] = NT_processed$APC_name8[!is.na(NT_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  NT_processed$taxa_status7 = NT_processed$taxa_status1  # your new merged column. Start with x
+  NT_processed$taxa_status7[!is.na(NT_processed$taxa_status2)] = NT_processed$taxa_status2[!is.na(NT_processed$taxa_status2)]  # merge with y
+  NT_processed$taxa_status7[!is.na(NT_processed$taxa_status3)] = NT_processed$taxa_status3[!is.na(NT_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  NT_processed$taxa_status8 = NT_processed$taxa_status4  # your new merged column. Start with x
+  NT_processed$taxa_status8[!is.na(NT_processed$taxa_status5)] = NT_processed$taxa_status5[!is.na(NT_processed$taxa_status5)]  # merge with y
+  NT_processed$taxa_status8[!is.na(NT_processed$taxa_status6)] = NT_processed$taxa_status6[!is.na(NT_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  NT_processed$taxa_status <- NT_processed$taxa_status7
+  NT_processed$taxa_status[!is.na(NT_processed$taxa_status8)] = NT_processed$taxa_status8[!is.na(NT_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_NTaccepted <- match(NT_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  NT_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_NTaccepted]
+  #populate alien status from distribution in ACT column
+  NT_processed$APC_Alien_Status <- APC_processed$NT[m_NTaccepted]
+  #populate authorship from ACT
+  NT_processed$APC_Authorship <- APC_processed$Author[m_NTaccepted]
+  
+  #select columns of interest
+  names(NT_processed)
+  NT_processed <- subset(NT_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+  
+  #add status comparison
+  NT_processed$Status_comparison <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  NT_processed$Most_conservative_status <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  NTMost_conservative_status_df <- as.data.frame(NT_processed[, c("Most_conservative_status")])
+  #add establishment_means
+  NT_processed$establishment_means <- apply(NTMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  NT_processed$degree_of_establishment <- apply(NTMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  NT_processedb <- unnest(NT_processed, establishment_means, keep_empty = TRUE)
+  NT_processedc <- unnest(NT_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  NT_compared <- as.data.frame(NT_processedc)
+
+  return(NT_compared)
+  cat('Dataset for the NT is ready')
+} #end of match_ACT function  
+
+############################################
+
+match_qld <- function(APC_raw, APC_processed, QLD_processed){
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  QLD_processed$QLD_sp_name_lower  <- tolower(QLD_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_QLD <- match(QLD_processed$QLD_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  QLD_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_QLD]
+  QLD_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_QLD]
+  
+  #match with original APC based on scientific name
+  m_QLD2 <- match(QLD_processed$QLD_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  QLD_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_QLD2]
+  QLD_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_QLD2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_QLD3 <- match(QLD_processed$QLD_sp_name_lower,APC_raw$APC_accepted_lower)
+  QLD_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_QLD3]
+  QLD_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_QLD3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_QLD4 <- match(QLD_processed$QLD_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  QLD_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_QLD4]
+  QLD_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_QLD4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_QLD5 <- match(QLD_processed$QLD_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  QLD_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_QLD5]
+  QLD_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_QLD5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_QLD6 <- match(QLD_processed$QLD_sp_name_lower,APC_accepted$APC_accepted_lower)
+  QLD_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_QLD6]
+  QLD_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_QLD6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  QLD_processed$APC_name7 = QLD_processed$APC_name1  # your new merged column. Start with x
+  QLD_processed$APC_name7[!is.na(QLD_processed$APC_name2)] = QLD_processed$APC_name2[!is.na(QLD_processed$APC_name2)]  # merge with y
+  QLD_processed$APC_name7[!is.na(QLD_processed$APC_name3)] = QLD_processed$APC_name3[!is.na(QLD_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  QLD_processed$APC_name8 = QLD_processed$APC_name4  # your new merged column. Start with x
+  QLD_processed$APC_name8[!is.na(QLD_processed$APC_name5)] = QLD_processed$APC_name5[!is.na(QLD_processed$APC_name5)]  # merge with y
+  QLD_processed$APC_name8[!is.na(QLD_processed$APC_name6)] = QLD_processed$APC_name6[!is.na(QLD_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  QLD_processed$APC_name <- QLD_processed$APC_name7
+  QLD_processed$APC_name[!is.na(QLD_processed$APC_name8)] = QLD_processed$APC_name8[!is.na(QLD_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  QLD_processed$taxa_status7 = QLD_processed$taxa_status1  # your new merged column. Start with x
+  QLD_processed$taxa_status7[!is.na(QLD_processed$taxa_status2)] = QLD_processed$taxa_status2[!is.na(QLD_processed$taxa_status2)]  # merge with y
+  QLD_processed$taxa_status7[!is.na(QLD_processed$taxa_status3)] = QLD_processed$taxa_status3[!is.na(QLD_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  QLD_processed$taxa_status8 = QLD_processed$taxa_status4  # your new merged column. Start with x
+  QLD_processed$taxa_status8[!is.na(QLD_processed$taxa_status5)] = QLD_processed$taxa_status5[!is.na(QLD_processed$taxa_status5)]  # merge with y
+  QLD_processed$taxa_status8[!is.na(QLD_processed$taxa_status6)] = QLD_processed$taxa_status6[!is.na(QLD_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  QLD_processed$taxa_status <- QLD_processed$taxa_status7
+  QLD_processed$taxa_status[!is.na(QLD_processed$taxa_status8)] = QLD_processed$taxa_status8[!is.na(QLD_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_QLDaccepted <- match(QLD_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  QLD_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_QLDaccepted]
+  #populate alien status from distribution in ACT column
+  QLD_processed$APC_Alien_Status <- APC_processed$Qld[m_QLDaccepted]
+  #populate authorship from ACT
+  QLD_processed$APC_Authorship <- APC_processed$Author[m_QLDaccepted]
+  
+  #select columns of interest
+  names(QLD_processed)
+  QLD_processed <- subset(QLD_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+
+  #add status comparison
+  QLD_processed$Status_comparison <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  QLD_processed$Most_conservative_status <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  QLDMost_conservative_status_df <- as.data.frame(QLD_processed[, c("Most_conservative_status")])
+  
+  #add establishment_means
+  QLD_processed$establishment_means <- apply(QLDMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  QLD_processed$degree_of_establishment <- apply(QLDMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  QLD_processedb <- unnest(QLD_processed, establishment_means, keep_empty = TRUE)
+  QLD_processedc <- unnest(QLD_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  QLD_compared <- as.data.frame(QLD_processedc)
+  
+  return(QLD_compared)
+  cat('Dataset for QLD is ready')
+} #end of match_QLD function
+
+############################################
+
+match_sa <- function(APC_raw, APC_processed, SA_processed) {
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  SA_processed$SA_sp_name_lower  <- tolower(SA_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_SA <- match(SA_processed$SA_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  SA_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_SA]
+  SA_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_SA]
+  
+  #match with original APC based on scientific name
+  m_SA2 <- match(SA_processed$SA_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  SA_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_SA2]
+  SA_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_SA2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_SA3 <- match(SA_processed$SA_sp_name_lower,APC_raw$APC_accepted_lower)
+  SA_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_SA3]
+  SA_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_SA3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_SA4 <- match(SA_processed$SA_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  SA_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_SA4]
+  SA_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_SA4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_SA5 <- match(SA_processed$SA_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  SA_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_SA5]
+  SA_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_SA5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_SA6 <- match(SA_processed$SA_sp_name_lower,APC_accepted$APC_accepted_lower)
+  SA_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_SA6]
+  SA_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_SA6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  SA_processed$APC_name7 = SA_processed$APC_name1  # your new merged column. Start with x
+  SA_processed$APC_name7[!is.na(SA_processed$APC_name2)] = SA_processed$APC_name2[!is.na(SA_processed$APC_name2)]  # merge with y
+  SA_processed$APC_name7[!is.na(SA_processed$APC_name3)] = SA_processed$APC_name3[!is.na(SA_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  SA_processed$APC_name8 = SA_processed$APC_name4  # your new merged column. Start with x
+  SA_processed$APC_name8[!is.na(SA_processed$APC_name5)] = SA_processed$APC_name5[!is.na(SA_processed$APC_name5)]  # merge with y
+  SA_processed$APC_name8[!is.na(SA_processed$APC_name6)] = SA_processed$APC_name6[!is.na(SA_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  SA_processed$APC_name <- SA_processed$APC_name7
+  SA_processed$APC_name[!is.na(SA_processed$APC_name8)] = SA_processed$APC_name8[!is.na(SA_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  SA_processed$taxa_status7 = SA_processed$taxa_status1  # your new merged column. Start with x
+  SA_processed$taxa_status7[!is.na(SA_processed$taxa_status2)] = SA_processed$taxa_status2[!is.na(SA_processed$taxa_status2)]  # merge with y
+  SA_processed$taxa_status7[!is.na(SA_processed$taxa_status3)] = SA_processed$taxa_status3[!is.na(SA_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  SA_processed$taxa_status8 = SA_processed$taxa_status4  # your new merged column. Start with x
+  SA_processed$taxa_status8[!is.na(SA_processed$taxa_status5)] = SA_processed$taxa_status5[!is.na(SA_processed$taxa_status5)]  # merge with y
+  SA_processed$taxa_status8[!is.na(SA_processed$taxa_status6)] = SA_processed$taxa_status6[!is.na(SA_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  SA_processed$taxa_status <- SA_processed$taxa_status47
+  SA_processed$taxa_status[!is.na(SA_processed$taxa_status8)] = SA_processed$taxa_status8[!is.na(SA_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_SAaccepted <- match(SA_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  SA_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_SAaccepted]
+  #populate alien status from distribution in ACT column
+  SA_processed$APC_Alien_Status <- APC_processed$SA[m_SAaccepted]
+  #populate authorship from ACT
+  SA_processed$APC_Authorship <- APC_processed$Author[m_SAaccepted]
+  
+  #select columns of interest
+  names(SA_processed)
+  SA_processed <- subset(SA_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+  
+  #add status comparison
+  SA_processed$Status_comparison <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  SA_processed$Most_conservative_status <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  SAMost_conservative_status_df <- as.data.frame(SA_processed[, c("Most_conservative_status")])
+  #add establishment_means
+  SA_processed$establishment_means <- apply(SAMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  SA_processed$degree_of_establishment <- apply(SAMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  SA_processedb <- unnest(SA_processed, establishment_means, keep_empty = TRUE)
+  SA_processedc <- unnest(SA_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  SA_compared <- as.data.frame(SA_processedc)
+ 
+  return(SA_compared)
+  cat('Dataset for SA is ready')
+}
+
+############################################
+match_tas <- function(APC_raw, APC_processed, TAS_processed) {
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  TAS_processed$TAS_sp_name_lower  <- tolower(TAS_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_TAS <- match(TAS_processed$TAS_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  TAS_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_TAS]
+  TAS_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_TAS]
+  
+  #match with original APC based on scientific name
+  m_TAS2 <- match(TAS_processed$TAS_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  TAS_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_TAS2]
+  TAS_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_TAS2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_TAS3 <- match(TAS_processed$TAS_sp_name_lower,APC_raw$APC_accepted_lower)
+  TAS_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_TAS3]
+  TAS_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_TAS3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_TAS4 <- match(TAS_processed$TAS_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  TAS_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_TAS4]
+  TAS_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_TAS4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_TAS5 <- match(TAS_processed$TAS_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  TAS_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_TAS5]
+  TAS_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_TAS5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_TAS6 <- match(TAS_processed$TAS_sp_name_lower,APC_accepted$APC_accepted_lower)
+  TAS_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_TAS6]
+  TAS_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_TAS6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  TAS_processed$APC_name7 = TAS_processed$APC_name1  # your new merged column. Start with x
+  TAS_processed$APC_name7[!is.na(TAS_processed$APC_name2)] = TAS_processed$APC_name2[!is.na(TAS_processed$APC_name2)]  # merge with y
+  TAS_processed$APC_name7[!is.na(TAS_processed$APC_name3)] = TAS_processed$APC_name3[!is.na(TAS_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  TAS_processed$APC_name8 = TAS_processed$APC_name4  # your new merged column. Start with x
+  TAS_processed$APC_name8[!is.na(TAS_processed$APC_name5)] = TAS_processed$APC_name5[!is.na(TAS_processed$APC_name5)]  # merge with y
+  TAS_processed$APC_name8[!is.na(TAS_processed$APC_name6)] = TAS_processed$APC_name6[!is.na(TAS_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  TAS_processed$APC_name <- TAS_processed$APC_name7
+  TAS_processed$APC_name[!is.na(TAS_processed$APC_name8)] = TAS_processed$APC_name8[!is.na(TAS_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  TAS_processed$taxa_status7 = TAS_processed$taxa_status1  # your new merged column. Start with x
+  TAS_processed$taxa_status7[!is.na(TAS_processed$taxa_status2)] = TAS_processed$taxa_status2[!is.na(TAS_processed$taxa_status2)]  # merge with y
+  TAS_processed$taxa_status7[!is.na(TAS_processed$taxa_status3)] = TAS_processed$taxa_status3[!is.na(TAS_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  TAS_processed$taxa_status8 = TAS_processed$taxa_status4  # your new merged column. Start with x
+  TAS_processed$taxa_status8[!is.na(TAS_processed$taxa_status5)] = TAS_processed$taxa_status5[!is.na(TAS_processed$taxa_status5)]  # merge with y
+  TAS_processed$taxa_status8[!is.na(TAS_processed$taxa_status6)] = TAS_processed$taxa_status6[!is.na(TAS_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  TAS_processed$taxa_status <- TAS_processed$taxa_status7
+  TAS_processed$taxa_status[!is.na(TAS_processed$taxa_status8)] = TAS_processed$taxa_status8[!is.na(TAS_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_TASaccepted <- match(TAS_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  TAS_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_TASaccepted]
+  #populate alien status from distribution in ACT column
+  TAS_processed$APC_Alien_Status <- APC_processed$Tas[m_TASaccepted]
+  #populate authorship from ACT
+  TAS_processed$APC_Authorship <- APC_processed$Author[m_TASaccepted]
+  
+  #select columns of interest
+  TAS_processed <- subset(TAS_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+  
+  #add status comparison
+  TAS_processed$Status_comparison <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  TAS_processed$Most_conservative_status <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  TASMost_conservative_status_df <- as.data.frame(TAS_processed[, c("Most_conservative_status")])
+  #add establishment_means
+  TAS_processed$establishment_means <- apply(TASMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  TAS_processed$degree_of_establishment <- apply(TASMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  TAS_processedb <- unnest(TAS_processed, establishment_means, keep_empty = TRUE)
+  TAS_processedc <- unnest(TAS_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  TAS_processed_FINAL <- as.data.frame(TAS_processedc)
+  
+  return(TAS_processed_FINAL)
+  cat('Dataset for TAS is ready')
+} #end of match_TAS function  
+
+############################################
+match_vic <- function(APC_raw, APC_processed, VIC_processed) {
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  VIC_processed$VIC_sp_name_lower  <- tolower(VIC_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_VIC <- match(VIC_processed$VIC_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  VIC_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_VIC] #extract matched name
+  VIC_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_VIC] #extract matched taxa status
+  
+  #match with original APC based on scientific name 
+  m_VIC2 <- match(VIC_processed$VIC_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  VIC_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_VIC2] #extract matched name
+  VIC_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_VIC2] #extract matched taxa status
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_VIC3 <- match(VIC_processed$VIC_sp_name_lower,APC_raw$APC_accepted_lower)
+  VIC_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_VIC3] #extract matched name
+  VIC_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_VIC3] #extract matched taxa status
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on APC based on canonical name
+  m_VIC4 <- match(VIC_processed$VIC_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  VIC_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_VIC4]
+  VIC_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_VIC4]
+  
+  #match with subset of accepted taxa on APC based on scientific name
+  m_VIC5 <- match(VIC_processed$VIC_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  VIC_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_VIC5]
+  VIC_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_VIC5]
+  
+  #match with subset of accepted taxa on APC based on accepted name
+  m_VIC6 <- match(VIC_processed$VIC_sp_name_lower,APC_accepted$APC_accepted_lower)
+  VIC_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_VIC6]
+  VIC_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_VIC6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  VIC_processed$APC_name7 = VIC_processed$APC_name1  
+  VIC_processed$APC_name7[!is.na(VIC_processed$APC_name2)] = VIC_processed$APC_name2[!is.na(VIC_processed$APC_name2)]  
+  VIC_processed$APC_name7[!is.na(VIC_processed$APC_name3)] = VIC_processed$APC_name3[!is.na(VIC_processed$APC_name3)]  
+  
+  #create a new column of APC_name based on the accepted dataset by merging with all
+  VIC_processed$APC_name8 = VIC_processed$APC_name4  
+  VIC_processed$APC_name8[!is.na(VIC_processed$APC_name5)] = VIC_processed$APC_name5[!is.na(VIC_processed$APC_name5)]  
+  VIC_processed$APC_name8[!is.na(VIC_processed$APC_name6)] = VIC_processed$APC_name6[!is.na(VIC_processed$APC_name6)]  
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  VIC_processed$taxa_status7 = VIC_processed$taxa_status1 
+  VIC_processed$taxa_status7[!is.na(VIC_processed$taxa_status2)] = VIC_processed$taxa_status2[!is.na(VIC_processed$taxa_status2)]  
+  VIC_processed$taxa_status7[!is.na(VIC_processed$taxa_status3)] = VIC_processed$taxa_status3[!is.na(VIC_processed$taxa_status3)]  
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  #match the taxa status of the APC accepted name
+  VIC_processed$taxa_status8 = VIC_processed$taxa_status4  # your new merged column. Start with x
+  VIC_processed$taxa_status8[!is.na(VIC_processed$taxa_status5)] = VIC_processed$taxa_status5[!is.na(VIC_processed$taxa_status5)]  # merge with y
+  VIC_processed$taxa_status8[!is.na(VIC_processed$taxa_status6)] = VIC_processed$taxa_status6[!is.na(VIC_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  VIC_processed$APC_name <- VIC_processed$APC_name7
+  VIC_processed$APC_name[!is.na(VIC_processed$APC_name8)] = VIC_processed$APC_name8[!is.na(VIC_processed$APC_name8)]  
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  VIC_processed$taxa_status <- VIC_processed$taxa_status7
+  VIC_processed$taxa_status[!is.na(VIC_processed$taxa_status8)] = VIC_processed$taxa_status8[!is.na(VIC_processed$taxa_status8)]  
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_VICaccepted <- match(VIC_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  VIC_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_VICaccepted]
+  #populate alien status from distribution in ACT column
+  VIC_processed$APC_Alien_Status <- APC_processed$Vic[m_VICaccepted]
+  #populate authorship from ACT
+  VIC_processed$APC_Authorship <- APC_processed$Author[m_VICaccepted]
+  
+  #select columns of interest
+  VIC_processed <- subset(VIC_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons. This one already has DC equivalences
+  
+  #add status comparison
+  VIC_processed$Status_comparison <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  VIC_processed$Most_conservative_status <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #no need to do further steps for Victoria, as it already includes establishment means and degree of establishment
+  #rename for consistency
+  VIC_processedb <- unnest(VIC_processed, Most_conservative_status, keep_empty = TRUE)
+  VIC_compared <- VIC_processedb
+  
+  return(VIC_compared)
+  cat('Dataset for VIC is ready')
+} #end of match_VIC function
+
+############################################
+match_wa <- function(APC_raw, APC_processed, WA_processed) {
+  
+  #we convert the original APC (the one that includes not only accepted names by also synonyms, excluded, misapplied, etc) to lower cases. We do did so that phrase species can also get a match because in some sources they use capitals but not in others
+  APC_raw$APC_all_canonical_lower <- tolower(APC_raw$canonicalName) 
+  APC_raw$APC_all_scientific_lower <- tolower(APC_raw$scientificName)
+  APC_raw$APC_accepted_lower <- tolower(APC_raw$acceptedNameUsage)
+  
+  #Do the same process with the subset of accepted taxa on the APC to prioritise matching with these ones
+  APC_accepted <- subset(APC_raw, taxonomicStatus == "accepted")
+  APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
+  APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
+  APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
+  
+  #convert species name on state censuses to lower case as well
+  WA_processed$WA_sp_name_lower  <- tolower(WA_processed$State_canonical_name)
+  
+  #1. match with original APC
+  #match with original APC based on canonical name (because phrase names sometimes match this one instead, depending on herbaria formats)
+  m_WA <- match(WA_processed$WA_sp_name_lower,APC_raw$APC_all_canonical_lower)
+  WA_processed$APC_name1 <- APC_raw$acceptedNameUsage[m_WA]
+  WA_processed$taxa_status1 <- APC_raw$taxonomicStatus[m_WA]
+  
+  #match with original APC based on scientific name
+  m_WA2 <- match(WA_processed$WA_sp_name_lower,APC_raw$APC_all_scientific_lower)
+  WA_processed$APC_name2 <- APC_raw$acceptedNameUsage[m_WA2]
+  WA_processed$taxa_status2 <- APC_raw$taxonomicStatus[m_WA2]
+  
+  #match with original APC based on accepted name (because if it already matches an accepted name, this has to be prioritise)
+  m_WA3 <- match(WA_processed$WA_sp_name_lower,APC_raw$APC_accepted_lower)
+  WA_processed$APC_name3 <- APC_raw$acceptedNameUsage[m_WA3]
+  WA_processed$taxa_status3 <- APC_raw$taxonomicStatus[m_WA3]
+  
+  #2. Match with accepted subset of APC
+  #match with subset of accepted taxa on the APC based on canonical name
+  m_WA4 <- match(WA_processed$WA_sp_name_lower,APC_accepted$APC_all_canonical_lower)
+  WA_processed$APC_name4 <- APC_accepted$acceptedNameUsage[m_WA4]
+  WA_processed$taxa_status4 <- APC_accepted$taxonomicStatus[m_WA4]
+  
+  #match with subset of accepted taxa on the APC based on scientific name
+  m_WA5 <- match(WA_processed$WA_sp_name_lower,APC_accepted$APC_all_scientific_lower)
+  WA_processed$APC_name5 <- APC_accepted$acceptedNameUsage[m_WA5]
+  WA_processed$taxa_status5 <- APC_accepted$taxonomicStatus[m_WA5]
+  
+  #match with subset of accepted taxa on the APC based on accepted name
+  m_WA6 <- match(WA_processed$WA_sp_name_lower,APC_accepted$APC_accepted_lower)
+  WA_processed$APC_name6 <- APC_accepted$acceptedNameUsage[m_WA6]
+  WA_processed$taxa_status6 <- APC_accepted$taxonomicStatus[m_WA6]
+  
+  #3. Combine both
+  #create new column of APC_name based on the original dataset by merging with all
+  WA_processed$APC_name7 = WA_processed$APC_name1  # your new merged column. Start with x
+  WA_processed$APC_name7[!is.na(WA_processed$APC_name2)] = WA_processed$APC_name2[!is.na(WA_processed$APC_name2)]  # merge with y
+  WA_processed$APC_name7[!is.na(WA_processed$APC_name3)] = WA_processed$APC_name3[!is.na(WA_processed$APC_name3)]  # merge with y
+  
+  #create new column of APC_name based on the accepted dataset by merging with all
+  WA_processed$APC_name8 = WA_processed$APC_name4  # your new merged column. Start with x
+  WA_processed$APC_name8[!is.na(WA_processed$APC_name5)] = WA_processed$APC_name5[!is.na(WA_processed$APC_name5)]  # merge with y
+  WA_processed$APC_name8[!is.na(WA_processed$APC_name6)] = WA_processed$APC_name6[!is.na(WA_processed$APC_name6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final APC_name column
+  WA_processed$APC_name <- WA_processed$APC_name7
+  WA_processed$APC_name[!is.na(WA_processed$APC_name8)] = WA_processed$APC_name8[!is.na(WA_processed$APC_name8)]  # merge with y
+  
+  #create a new column of taxa_status based on the original dataset by merging with all
+  WA_processed$taxa_status7 = WA_processed$taxa_status1  # your new merged column. Start with x
+  WA_processed$taxa_status7[!is.na(WA_processed$taxa_status2)] = WA_processed$taxa_status2[!is.na(WA_processed$taxa_status2)]  # merge with y
+  WA_processed$taxa_status7[!is.na(WA_processed$taxa_status3)] = WA_processed$taxa_status3[!is.na(WA_processed$taxa_status3)]  # merge with y
+  
+  #create a new column of taxa_status based on the accepted dataset by merging with all
+  WA_processed$taxa_status8 = WA_processed$taxa_status4  # your new merged column. Start with x
+  WA_processed$taxa_status8[!is.na(WA_processed$taxa_status5)] = WA_processed$taxa_status5[!is.na(WA_processed$taxa_status5)]  # merge with y
+  WA_processed$taxa_status8[!is.na(WA_processed$taxa_status6)] = WA_processed$taxa_status6[!is.na(WA_processed$taxa_status6)]  # merge with y
+  
+  #Combine both columns resulting of matching process with original and accepted APC databases into a final taxa_status column
+  WA_processed$taxa_status <- WA_processed$taxa_status7
+  WA_processed$taxa_status[!is.na(WA_processed$taxa_status8)] = WA_processed$taxa_status8[!is.na(WA_processed$taxa_status8)]  # merge with y
+  
+  #4. Populate other fields from APC
+  #match code between the final APC name we have created and the APC name of our master dataset (only including accepted taxa)
+  m_WAaccepted <- match(WA_processed$APC_name,APC_processed$APC_name)
+  #populate canonical name from APC
+  WA_processed$APC_canonical_name <- APC_processed$APC_canonical_name[m_WAaccepted]
+  #populate alien status from distribution in ACT column
+  WA_processed$APC_Alien_Status <- APC_processed$WA[m_WAaccepted]
+  #populate authorship from ACT
+  WA_processed$APC_Authorship <- APC_processed$Author[m_WAaccepted]
+  
+  #select columns of interest
+  WA_processed <- subset(WA_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  #census dataset ready for subsequent comparisons and to add DC equivalences
+  
+  #add status comparison
+  WA_processed$Status_comparison <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  #add most conservative status
+  WA_processed$Most_conservative_status <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
+  WAMost_conservative_status_df <- as.data.frame(WA_processed[, c("Most_conservative_status")])
+  #add establishment_means
+  WA_processed$establishment_means <- apply(WAMost_conservative_status_df, 1, state_establishment_means)
+  #add degree_of_establishment
+  WA_processed$degree_of_establishment <- apply(WAMost_conservative_status_df, 1, state_degree_of_establishment)
+  #unnest both variables
+  WA_processedb <- unnest(WA_processed, establishment_means, keep_empty = TRUE)
+  WA_processedc <- unnest(WA_processedb, degree_of_establishment, keep_empty = TRUE)
+  #convert to df
+  WA_compared <- as.data.frame(WA_processedc)
+
+  return(WA_compared)
+  cat('Dataset for WA is ready')
+} #end of match_WA function
+
+############################################
+national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_NSW_state_dataset, AAFSS_NT_state_dataset, AAFSS_QLD_state_dataset, AAFSS_SA_state_dataset, AAFSS_TAS_state_dataset, AAFSS_VIC_state_dataset, AAFSS_WA_state_dataset, GRIIS_processed){
+  
+  #ACT
+  APC_processed$ACT_most_conservative <- as.character(AAFSS_ACT_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_ACT_state_dataset$APC_canonical_name))]
+  APC_processed$ACT_most_conservative[which(is.na(APC_processed$ACT_most_conservative))] <- as.character(APC_processed$ACT)[which(is.na(APC_processed$ACT_most_conservative))]
+  
+  #NSW#
+  APC_processed$NSW_most_conservative <- as.character(AAFSS_NSW_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NSW_state_dataset$APC_canonical_name))]
+  APC_processed$NSW_most_conservative[which(is.na(APC_processed$NSW_most_conservative))] <- as.character(APC_processed$NSW)[which(is.na(APC_processed$NSW_most_conservative))]
+  
+  #NT#
+  APC_processed$NT_most_conservative <- as.character(AAFSS_NT_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NT_state_dataset$APC_canonical_name))]
+  APC_processed$NT_most_conservative[which(is.na(APC_processed$NT_most_conservative))] <- as.character(APC_processed$NT)[which(is.na(APC_processed$NT_most_conservative))]
+  
+  #QLD#
+  APC_processed$QLD_most_conservative <- as.character(AAFSS_QLD_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_QLD_state_dataset$APC_canonical_name))]
+  APC_processed$QLD_most_conservative[which(is.na(APC_processed$QLD_most_conservative))] <- as.character(APC_processed$Qld)[which(is.na(APC_processed$QLD_most_conservative))]
+  
+  #SA#
+  APC_processed$SA_most_conservative <- as.character(AAFSS_SA_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_SA_state_dataset$APC_canonical_name))]
+  APC_processed$SA_most_conservative[which(is.na(APC_processed$SA_most_conservative))] <- as.character(APC_processed$SA)[which(is.na(APC_processed$SA_most_conservative))]
+  
+  #TAS#
+  APC_processed$TAS_most_conservative <- as.character(AAFSS_TAS_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_TAS_state_dataset$APC_canonical_name))]
+  APC_processed$TAS_most_conservative[which(is.na(APC_processed$TAS_most_conservative))] <- as.character(APC_processed$Tas)[which(is.na(APC_processed$TAS_most_conservative))]
+  
+  #VIC#
+  APC_processed$VIC_most_conservative <- as.character(AAFSS_VIC_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_VIC_state_dataset$APC_canonical_name))]
+  APC_processed$VIC_most_conservative[which(is.na(APC_processed$VIC_most_conservative))] <- as.character(APC_processed$Vic)[which(is.na(APC_processed$VIC_most_conservative))]
+  
+  #WA#
+  APC_processed$WA_most_conservative <- as.character(AAFSS_WA_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_WA_state_dataset$APC_canonical_name))]
+  APC_processed$WA_most_conservative[which(is.na(APC_processed$WA_most_conservative))] <- as.character(APC_processed$WA)[which(is.na(APC_processed$WA_most_conservative))]
+  
+  #associate exact string to names we want to use
+  native <- c("native")
+  naturalised <- c("naturalised")
+  doubtfully_naturalised <- c("doubtfully naturalised")
+  formerly_naturalised <- c("formerly naturalised")
+  introduced <- c("introduced")
+  uncertain <- c("uncertain origin")
+  native_colonising <- c("native colonising")
+  native_colonising_potential <- c("native potentially colonising")
+  presumed_extinct <- c("presumed extinct")
+  doubtfully_introduced <- c("doubtfully introduced")
+  formerly_introduced <- c("formerly introduced")
+  
+  #count, for each species, and for each introduction status, if there are recorded as such across states and main territories. If recorded as such we will obtain "1" regardless of in how many states or territories it appears with such status
+  #count if recorded as native in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countNative <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native %in% x))
+  #count if recorded as native potentially colonising in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countNative_colonising_potential <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native_colonising_potential %in% x))
+  #count if recorded as native colonising in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countNative_colonising <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native_colonising %in% x))
+  #count if recorded as having uncertain origin in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countUncertain <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(uncertain %in% x))
+  #count if recorded as naturalised in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countNaturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(naturalised %in% x))
+  #count if recorded as doubtfully naturalised in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countdoubtfully_naturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(doubtfully_naturalised %in% x))
+  #count if recorded as introduced in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countIntroduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(introduced %in% x))
+  #count if recorded as doubtfully introduced in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countdoubtfully_introduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(doubtfully_introduced %in% x))
+  #count if recorded as formerly naturalised in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countformerly_naturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(formerly_naturalised %in% x))
+  #count if recorded as presumed extinct in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countpresumed_extinct <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(presumed_extinct %in% x))
+  #count if recorded as formerly introduced in any state or main territory. 1 if yes, 0 if not.
+  APC_processed$countformerly_introduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(formerly_introduced %in% x))
+  
+  #change ones (1) for strings that we want to use
+  APC_processed$countNative[APC_processed$countNative=="1"] <- "native"
+  APC_processed$countNative_colonising_potential[APC_processed$countNative_colonising_potential=="1"] <- "native colonising potential"
+  APC_processed$countNative_colonising[APC_processed$countNative_colonising=="1"] <- "native colonising"
+  APC_processed$countUncertain[APC_processed$countUncertain=="1"] <- "uncertain origin"
+  APC_processed$countNaturalised[APC_processed$countNaturalised=="1"] <- "naturalised"
+  APC_processed$countdoubtfully_naturalised[APC_processed$countdoubtfully_naturalised=="1"] <- "doubtfully naturalised"
+  APC_processed$countIntroduced[APC_processed$countIntroduced=="1"] <- "introduced"
+  APC_processed$countdoubtfully_introduced[APC_processed$countdoubtfully_introduced=="1"] <- "doubtfully introduced"
+  APC_processed$countformerly_naturalised[APC_processed$countformerly_naturalised=="1"] <- "formerly naturalised"
+  APC_processed$countpresumed_extinct[APC_processed$countpresumed_extinct=="1"] <- "presumed extinct"
+  APC_processed$countformerly_introduced[APC_processed$countformerly_introduced=="1"] <- "formerly introduced"
+  
+  #substitute zeros (0) by NA
+  APC_processed$countNative[APC_processed$countNative=="0"] <- NA
+  APC_processed$countNative_colonising_potential[APC_processed$countNative_colonising_potential=="0"] <- NA
+  APC_processed$countNative_colonising[APC_processed$countNative_colonising=="0"] <- NA
+  APC_processed$countUncertain[APC_processed$countUncertain=="0"] <- NA
+  APC_processed$countNaturalised[APC_processed$countNaturalised=="0"] <- NA
+  APC_processed$countdoubtfully_naturalised[APC_processed$countdoubtfully_naturalised=="0"] <- NA
+  APC_processed$countIntroduced[APC_processed$countIntroduced=="0"] <- NA
+  APC_processed$countdoubtfully_introduced[APC_processed$countdoubtfully_introduced=="0"] <- NA
+  APC_processed$countformerly_naturalised[APC_processed$countformerly_naturalised=="0"] <- NA
+  APC_processed$countpresumed_extinct[APC_processed$countpresumed_extinct=="0"] <- NA
+  APC_processed$countformerly_introduced[APC_processed$countformerly_introduced=="0"] <- NA
+  
+  #Create subsequent columns applying prioritisation process at national scale by pairs of statuses.
+  #First native (any)
+  #For that, we first start with native species, as if a species is native to a state or territory, it will keep its native status at national scale. If the species is not native to any state, we check if there is native potentially colonising
+  APC_processed$Native1 <- ifelse(is.na(APC_processed$countNative), APC_processed$countNative_colonising_potential, APC_processed$countNative)
+  #If the species is not native to any state, we check if there is any record of the species being native colonising into any state or territory
+  APC_processed$Native2 <- ifelse(is.na(APC_processed$Native1), APC_processed$countNative_colonising, APC_processed$Native1)
+  
+  ##Second, uncertain records
+  #After having done all native (any), we check if perhaps the species has been recorded as having uncertain origin in any state or territory
+  APC_processed$NativeU <- ifelse(is.na(APC_processed$Native2), APC_processed$countUncertain, APC_processed$Native2)
+  
+  ##Third, alien records, from furthest to closest introduction status along the introduction-naturalisation-invasion continuum
+  #After having done all native (any) and uncertain, we check if it is recorded as naturalised in any state
+  APC_processed$NUAlien1 <- ifelse(is.na(APC_processed$NativeU), APC_processed$countNaturalised, APC_processed$NativeU)
+  #If, apart from the previous ones, it is not recorded as naturalised in any state, we check if it is doubtfully naturalised
+  APC_processed$NUAlien2 <- ifelse(is.na(APC_processed$NUAlien1), APC_processed$countdoubtfully_naturalised, APC_processed$NUAlien1)
+  #If, apart from the previous ones, it is not recorded as doubtfully naturalised in any state, we check if it is introduced
+  APC_processed$NUAlien3 <- ifelse(is.na(APC_processed$NUAlien2), APC_processed$countIntroduced, APC_processed$NUAlien2)
+  #If, apart from the previous ones, it is not recorded as introduced in any state, we check if it is doubtfully introduced
+  APC_processed$NUAlien4 <- ifelse(is.na(APC_processed$NUAlien3), APC_processed$countdoubtfully_introduced, APC_processed$NUAlien3)
+  #If, apart from the previous ones, it is not recorded as doubtfully introduced in any state, we check if it is formerly naturalised
+  APC_processed$NUAlien5 <- ifelse(is.na(APC_processed$NUAlien4), APC_processed$countformerly_naturalised, APC_processed$NUAlien4)
+  
+  #Fourth, we incorporate presence-related statuses (i.e. formerly introduced or presumed exinct) 
+  #If, apart from the previous ones, it is not recorded as formerly introduced in any state, we check if it is formerly naturalised
+  APC_processed$NUAExtinct1 <- ifelse(is.na(APC_processed$NUAlien5), APC_processed$countformerly_introduced, APC_processed$NUAlien5)
+  APC_processed$National_Status <- ifelse(is.na(APC_processed$NUAExtinct1), APC_processed$countpresumed_extinct, APC_processed$NUAExtinct1)
+  
+  #match the APC_processed name into the State database
+  m_GRIIS <- match(APC_processed$APC_canonical_name, GRIIS_processed$GRIIS_canonical_name)
+  #populate the GRIIS alien status into the master dataset
+  APC_processed$GRIIS_Alien_Status <- GRIIS_processed$GRIIS_Alien_Status[m_GRIIS]
+  
+  #add column result of the comparison with the GRIIS
+  APC_processed$GRIIS_comparison <- apply(APC_processed[, c("National_Status", "GRIIS_Alien_Status")], 1, compare_status_GRIIS)
+  
+  #add national status product of our AusAFW
+  APC_processed$AAFSS_Alien_status <- apply(APC_processed[, c("National_Status", "GRIIS_Alien_Status", "GRIIS_comparison")], 1, return_conservative_status_GRIIS)
+  
+  #function for equivalences with DC terminology establishment means for status at the national scale
+  #convert national status to a df to create DC equivalences
+  national_status_df <- as.data.frame(APC_processed[, c("National_Status")])
+  APC_processed$establishment_means <- apply(national_status_df, 1, national_establishment_means)
+  APC_processed$degree_of_establishment <- apply(APC_processed[, c("establishment_means", "National_Status")], 1, national_degree_of_establishment)
+  APC_processed_b <- unnest(APC_processed, establishment_means, keep_empty = TRUE)
+  APC_processed_c <- unnest(APC_processed_b, degree_of_establishment, keep_empty = TRUE)
+  
+  AAFSS <- as.data.frame(APC_processed_c)
+  AAFSS <- subset(AAFSS, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_most_conservative', 'NSW_most_conservative', 'NT_most_conservative', 'QLD_most_conservative', 'SA_most_conservative', 'TAS_most_conservative', 'VIC_most_conservative',	'WA_most_conservative', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AAFSS_Alien_status', 'establishment_means', 'degree_of_establishment'))
+  if("GBIF_name" %in% colnames(APC_processed_c)){
+  GBIF <- subset(APC_processed_c, select=c('GBIF_name', 'GBIF_canon_name'))
+  AAFSS <- cbind(AAFSS, GBIF)
+  }
+  View(AAFSS)
+  if("WFO_name" %in% colnames(APC_processed_c)){
+  WFO <- subset(APC_processed_c, select=c('WFO_name', 'WFO_canon_name'))
+  AAFSS <- cbind(AAFSS, WFO)
+  }
+  return(AAFSS) #alternatively, if you want the further modified state objects returned to user as well, either split up into a function per state for matching and return that state here, or run the whole thing but return a list with e.g., $AusAFW, $WA2022, $NSW2022, ... etc
+  }#end of function
+
+#end of script
