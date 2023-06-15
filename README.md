@@ -19,14 +19,23 @@ Before proceeding to use this script, there are a few prior steps that need to b
 #Australian Plant Census (APC) = https://biodiversity.org.au/nsl/services/export/index
 
 #State and main territories plant censuses
+
 #Australian Capital Territory (ACT) = https://www.cpbr.gov.au/cpbr/ACT-census/vascular-gen-alpha.html
+
 #New South Wales (NSW) = request to the Royal Botanic Gardens, as it cannot be directly downloaded from electronic sources
+
 #Northern Territory (NT) = http://eflora.nt.gov.au/NTSpeciesList?heading=sNTSpecies
+
 #Queensland (QLD) = https://www.data.qld.gov.au/dataset/census-of-the-queensland-flora-and-fungi-2022/resource/548d9394-c94c-4512-a2fa-8f667dac2a2f
+
 #South Australia (SA) = https://data.environment.sa.gov.au/Content/Publications/vascular-plants-bdbsa-taxonomy.xlsx
+
 #Tasmania (TAS) = https://flora.tmag.tas.gov.au/resources/census/
+
 #Victoria (VIC) = https://vicflora.rbg.vic.gov.au/flora/download?q=*:*
+
 #Western Australia (WA) = request to the Western Australian Herbarium, as it cannot be directly downloaded from electronic sources
+
 
 #Australian Global Registry of Introduced and Invasive Species (GRIIS) = https://cloud.gbif.org/griis/resource?r=griis-australia&v=1.9#anchor-downloads
 
