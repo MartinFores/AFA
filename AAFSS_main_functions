@@ -1,4 +1,4 @@
-#AAFSS_main_functions.R
+#AAFSS_functions.R
 ###############################################
 
 #source functions:
@@ -119,6 +119,10 @@ curate_act <- function(ACT, cross_GBIF = FALSE, cross_WFO = FALSE) {
   
   #create new columns for territory (i.e. state for simplicity) canonical name and scientific name using the functions created
   ACT$State_canonical_name <- apply(ACT[, c("GENUS", "SPECIES", "INFRASPECIES")], 1, canonical_name_for_ACT)
+  
+  #Change × by x to make all datasets homogenised
+  ACT$State_canonical_name <- gsub('×', "x ", ACT$State_canonical_name, fixed=TRUE)
+  ACT$State_canonical_name <- gsub('  ', " ", ACT$State_canonical_name, fixed=TRUE)
   
   #remove brackets and symbols from ORIGIN column
   ACT$ORIGIN <- gsub('[', "", ACT$ORIGIN, fixed=TRUE)
@@ -383,6 +387,10 @@ curate_sa <- function(SA, cross_GBIF = FALSE, cross_WFO = FALSE) {
   SA$State_canonical_name <- str_replace(SA$State_canonical_name, "ssp.", "subsp.")
   SA$State_name <- str_replace(SA$State_name, "ssp.", "subsp.")
   
+  #Change X by x for hybrids to make all datasets homogenised
+  SA$State_canonical_name  <- gsub(' X ', " x ", SA$State_canonical_name, fixed=TRUE)
+  SA$State_name <- gsub(' X ', " x ", SA$State_name, fixed=TRUE)
+
   #substitute codes for introduction with the ones proposed in AusAFW
   #assign introduced when *
   SA$INTRODUCED <- str_replace(SA$INTRODUCED, "[*]", "introduced")
@@ -568,9 +576,14 @@ curate_vic <- function(VIC, cross_GBIF = FALSE, cross_WFO = FALSE) {
   VIC$authorship <- ifelse(is.na(VIC$accepted_name_usage_authorship), VIC$scientific_name_authorship, VIC$accepted_name_usage_authorship)
   #create a column for state name (scientific name), by combining canonical name and author
   VIC$State_name <- paste(VIC$State_canonical_name, VIC$authorship, sep =" ")
-  
+    
   #remove duplicate records of canonical name
   VIC <- VIC[!duplicated(VIC$State_canonical_name),]
+  #Change × by x to make all datasets homogenised
+  VIC$State_name <- gsub('×', "x ", VIC$State_name, fixed=TRUE)
+  VIC$State_canonical_name <- gsub('×', "x ", VIC$State_canonical_name, fixed=TRUE)
+  VIC$State_name <- gsub('  ', " ", VIC$State_name, fixed=TRUE)
+  VIC$State_canonical_name <- gsub('  ', " ", VIC$State_canonical_name, fixed=TRUE)
   
   #remove records appearing as excluded for occurrence status
   VIC <- subset(VIC, occurrence_status!="excluded")
@@ -596,14 +609,15 @@ curate_vic <- function(VIC, cross_GBIF = FALSE, cross_WFO = FALSE) {
   #create column for alien status by combining introduction status, origin, and occurrence. If introduction status is NA, keep record from recently created column extinct_status
   VIC$State_Alien_Status <- ifelse(is.na(VIC$introduction_status), VIC$extinct_status, VIC$introduction_status)
   VIC$State_Alien_Status <- ifelse(!is.na(VIC$has_introduced_occurrences), VIC$has_introduced_occurrences, VIC$State_Alien_Status)
-  
+
   #keeps the one we are interested in. We also keep here the DC concepts for establishment means and degree of establishment< as we will need them later.
   VIC <- subset(VIC, select = c("State_name", "State_canonical_name", "State_Alien_Status", "establishment_means", "degree_of_establishment"))
 
   #remove duplicates based on state name
   VIC <- VIC[!duplicated(VIC$State_name),]
   #VIC plant census is now standardised and ready to be cross-referenced with AusAFW
-  
+  VIC$State_name <- sub(VIC$State_name, pattern = "[ NA]*$", replacement = "")
+ 
   if(cross_GBIF){
     VIC <- cross_GBIF(dataset = VIC)  
   }
@@ -856,7 +870,7 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   #status comparison between state censuses and APC
   #ACT#
   #add status comparison
-  ACT_processed$Status_comparison <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  ACT_processed$Status_comparison <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   ACT_processed$Most_conservative_status <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -873,7 +887,6 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   #save dataset for supplementary material
   
   return(ACT_compared)
-  cat('Dataset for the ACT is ready')
 } #end of match_ACT function
 
 ############################################
@@ -970,7 +983,7 @@ match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
   #census dataset ready for subsequent comparisons and to add DC equivalences
   
   #add status comparison
-  NSW_processed$Status_comparison <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  NSW_processed$Status_comparison <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   NSW_processed$Most_conservative_status <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   Most_con <- unnest(NSW_processed, Most_conservative_status, keep_empty = TRUE)
@@ -988,8 +1001,7 @@ match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
   NSW_compared <- as.data.frame(NSW_processedd)
 
   return(NSW_compared)
-  cat('Dataset for NSW is ready')
-} #end of match_ACT function
+} #end of match_NSW function
 
 ############################################
 
@@ -1086,7 +1098,7 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   #census dataset ready for subsequent comparisons and to add DC equivalences
   
   #add status comparison
-  NT_processed$Status_comparison <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  NT_processed$Status_comparison <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   NT_processed$Most_conservative_status <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -1102,8 +1114,7 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   NT_compared <- as.data.frame(NT_processedc)
 
   return(NT_compared)
-  cat('Dataset for the NT is ready')
-} #end of match_ACT function  
+} #end of match_NT function  
 
 ############################################
 
@@ -1200,7 +1211,7 @@ match_qld <- function(APC_raw, APC_processed, QLD_processed){
   #census dataset ready for subsequent comparisons and to add DC equivalences
 
   #add status comparison
-  QLD_processed$Status_comparison <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  QLD_processed$Status_comparison <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   QLD_processed$Most_conservative_status <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -1217,7 +1228,6 @@ match_qld <- function(APC_raw, APC_processed, QLD_processed){
   QLD_compared <- as.data.frame(QLD_processedc)
   
   return(QLD_compared)
-  cat('Dataset for QLD is ready')
 } #end of match_QLD function
 
 ############################################
@@ -1315,7 +1325,7 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   #census dataset ready for subsequent comparisons and to add DC equivalences
   
   #add status comparison
-  SA_processed$Status_comparison <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  SA_processed$Status_comparison <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   SA_processed$Most_conservative_status <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -1331,8 +1341,7 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   SA_compared <- as.data.frame(SA_processedc)
  
   return(SA_compared)
-  cat('Dataset for SA is ready')
-}
+} #end of match_SA function
 
 ############################################
 match_tas <- function(APC_raw, APC_processed, TAS_processed) {
@@ -1427,7 +1436,7 @@ match_tas <- function(APC_raw, APC_processed, TAS_processed) {
   #census dataset ready for subsequent comparisons and to add DC equivalences
   
   #add status comparison
-  TAS_processed$Status_comparison <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  TAS_processed$Status_comparison <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   TAS_processed$Most_conservative_status <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -1443,7 +1452,6 @@ match_tas <- function(APC_raw, APC_processed, TAS_processed) {
   TAS_processed_FINAL <- as.data.frame(TAS_processedc)
   
   return(TAS_processed_FINAL)
-  cat('Dataset for TAS is ready')
 } #end of match_TAS function  
 
 ############################################
@@ -1459,7 +1467,7 @@ match_vic <- function(APC_raw, APC_processed, VIC_processed) {
   APC_accepted$APC_all_canonical_lower <- tolower(APC_accepted$APC_all_canonical)
   APC_accepted$APC_all_scientific_lower <- tolower(APC_accepted$APC_all_scientific)
   APC_accepted$APC_accepted_lower <- tolower(APC_accepted$APC_accepted)
-  
+ 
   #convert species name on state censuses to lower case as well
   VIC_processed$VIC_sp_name_lower  <- tolower(VIC_processed$State_canonical_name)
   
@@ -1534,22 +1542,23 @@ match_vic <- function(APC_raw, APC_processed, VIC_processed) {
   VIC_processed$APC_Alien_Status <- APC_processed$Vic[m_VICaccepted]
   #populate authorship from ACT
   VIC_processed$APC_Authorship <- APC_processed$Author[m_VICaccepted]
-  
+
   #select columns of interest
-  VIC_processed <- subset(VIC_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
+  VIC_processed <- subset(VIC_processed, select = c("State_name", "State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status", "establishment_means", "degree_of_establishment"))
   #census dataset ready for subsequent comparisons. This one already has DC equivalences
   
   #add status comparison
-  VIC_processed$Status_comparison <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  VIC_processed$Status_comparison <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   VIC_processed$Most_conservative_status <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #no need to do further steps for Victoria, as it already includes establishment means and degree of establishment
   #rename for consistency
   VIC_processedb <- unnest(VIC_processed, Most_conservative_status, keep_empty = TRUE)
-  VIC_compared <- VIC_processedb
-  
-  return(VIC_compared)
-  cat('Dataset for VIC is ready')
+  VIC_compared <- as.data.frame(VIC_processedb)
+  #VIC_encoded <- lapply(VIC_compared, iconv, to = "Latin1")
+  #VIC_encoded <- as.data.frame(VIC_encoded)
+ 
+  return(VIC_encoded)
 } #end of match_VIC function
 
 ############################################
@@ -1645,7 +1654,7 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
   #census dataset ready for subsequent comparisons and to add DC equivalences
   
   #add status comparison
-  WA_processed$Status_comparison <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status")], 1, compare_status)
+  WA_processed$Status_comparison <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   WA_processed$Most_conservative_status <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
@@ -1661,7 +1670,6 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
   WA_compared <- as.data.frame(WA_processedc)
 
   return(WA_compared)
-  cat('Dataset for WA is ready')
 } #end of match_WA function
 
 ############################################
@@ -1803,21 +1811,18 @@ national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_N
   
   #function for equivalences with DC terminology establishment means for status at the national scale
   #convert national status to a df to create DC equivalences
-  national_status_df <- as.data.frame(APC_processed[, c("National_Status")])
-  APC_processed$establishment_means <- apply(national_status_df, 1, national_establishment_means)
-  APC_processed$degree_of_establishment <- apply(APC_processed[, c("establishment_means", "National_Status")], 1, national_degree_of_establishment)
-  APC_processed_b <- unnest(APC_processed, establishment_means, keep_empty = TRUE)
-  APC_processed_c <- unnest(APC_processed_b, degree_of_establishment, keep_empty = TRUE)
+  #national_status_df <- as.data.frame(APC_processed[, c("National_Status")])
+  APC_processed$establishment_means <- sapply(APC_processed[, c("National_Status")], national_establishment_means)
+  APC_processed$degree_of_establishment <- sapply(APC_processed[, c("establishment_means", "National_Status")], national_degree_of_establishment)
+  AAFSS <- subset(APC_processed, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_most_conservative', 'NSW_most_conservative', 'NT_most_conservative', 'QLD_most_conservative', 'SA_most_conservative', 'TAS_most_conservative', 'VIC_most_conservative',	'WA_most_conservative', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AAFSS_Alien_status', 'establishment_means', 'degree_of_establishment'))
   
-  AAFSS <- as.data.frame(APC_processed_c)
-  AAFSS <- subset(AAFSS, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_most_conservative', 'NSW_most_conservative', 'NT_most_conservative', 'QLD_most_conservative', 'SA_most_conservative', 'TAS_most_conservative', 'VIC_most_conservative',	'WA_most_conservative', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AAFSS_Alien_status', 'establishment_means', 'degree_of_establishment'))
-  if("GBIF_name" %in% colnames(APC_processed_c)){
-  GBIF <- subset(APC_processed_c, select=c('GBIF_name', 'GBIF_canon_name'))
+  if("GBIF_name" %in% colnames(APC_processed)){
+  GBIF <- subset(APC_processed, select=c('GBIF_name', 'GBIF_canon_name'))
   AAFSS <- cbind(AAFSS, GBIF)
   }
-  View(AAFSS)
-  if("WFO_name" %in% colnames(APC_processed_c)){
-  WFO <- subset(APC_processed_c, select=c('WFO_name', 'WFO_canon_name'))
+  
+  if("WFO_name" %in% colnames(APC_processed)){
+  WFO <- subset(APC_processed, select=c('WFO_name', 'WFO_canon_name'))
   AAFSS <- cbind(AAFSS, WFO)
   }
   return(AAFSS) #alternatively, if you want the further modified state objects returned to user as well, either split up into a function per state for matching and return that state here, or run the whole thing but return a list with e.g., $AusAFW, $WA2022, $NSW2022, ... etc
