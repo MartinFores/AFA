@@ -863,7 +863,6 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   #populate authorship from ACT
   ACT_processed$APC_Authorship <- APC_processed$Author[m_ACTaccepted]
   
-  names(ACT_processed)
   #select columns of interest
   ACT_processed <- subset(ACT_processed, select = c("State_canonical_name", "State_Alien_Status", "APC_name", "APC_canonical_name", "APC_Alien_Status", "APC_Authorship", "taxa_status"))
   
@@ -873,8 +872,32 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   ACT_processed$Status_comparison <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   ACT_processed$Most_conservative_status <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_ACT <- ACT_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  ACT_processed$APC_name[pro_parte_modify_ACT]<- NA
+  ACT_processed$APC_canonical_name[pro_parte_modify_ACT]<- NA
+  ACT_processed$APC_Authorship[pro_parte_modify_ACT]<- NA
+  ACT_processed$APC_Alien_Status[pro_parte_modify_ACT]<- NA
+  ACT_processed$Status_comparison[pro_parte_modify_ACT]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  ACT_processed$Most_conservative_status[pro_parte_modify_ACT]<- ACT_processed$State_Alien_Status[pro_parte_modify_ACT]
+  ACT_processed$taxa_status[pro_parte_modify_ACT]<- "pro parte misapplied"
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   ACTMost_conservative_status_df <- as.data.frame(ACT_processed[, c("Most_conservative_status")])
+  
   #add establishment_means
   ACT_processed$establishment_means <- apply(ACTMost_conservative_status_df, 1, state_establishment_means)
   #add degree_of_establishment
@@ -988,6 +1011,28 @@ match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
   NSW_processed$Most_conservative_status <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   Most_con <- unnest(NSW_processed, Most_conservative_status, keep_empty = TRUE)
   NSW_processedb <- as.data.frame(Most_con)
+  
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_NSW <- NSW_processedb$State_canonical_name %in% pro_parte$State_canonical_name
+  NSW_processedb$APC_name[pro_parte_modify_NSW]<- NA
+  NSW_processedb$APC_canonical_name[pro_parte_modify_NSW]<- NA
+  NSW_processedb$APC_Authorship[pro_parte_modify_NSW]<- NA
+  NSW_processedb$APC_Alien_Status[pro_parte_modify_NSW]<- NA
+  NSW_processedb$Status_comparison[pro_parte_modify_NSW]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  NSW_processedb$Most_conservative_status[pro_parte_modify_NSW]<- NSW_processedb$State_Alien_Status[pro_parte_modify_NSW]
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   NSWMost_conservative_status_df <- as.data.frame(NSW_processedb[, c("Most_conservative_status")])
   #add establishment_means
@@ -1101,8 +1146,31 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   NT_processed$Status_comparison <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   NT_processed$Most_conservative_status <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_NT <- NT_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  NT_processed$APC_name[pro_parte_modify_NT]<- NA
+  NT_processed$APC_canonical_name[pro_parte_modify_NT]<- NA
+  NT_processed$APC_Authorship[pro_parte_modify_NT]<- NA
+  NT_processed$APC_Alien_Status[pro_parte_modify_NT]<- NA
+  NT_processed$Status_comparison[pro_parte_modify_NT]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  NT_processed$Most_conservative_status[pro_parte_modify_NT]<- NT_processed$State_Alien_Status[pro_parte_modify_NT]
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   NTMost_conservative_status_df <- as.data.frame(NT_processed[, c("Most_conservative_status")])
+  
   #add establishment_means
   NT_processed$establishment_means <- apply(NTMost_conservative_status_df, 1, state_establishment_means)
   #add degree_of_establishment
@@ -1112,7 +1180,7 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   NT_processedc <- unnest(NT_processedb, degree_of_establishment, keep_empty = TRUE)
   #convert to df
   NT_compared <- as.data.frame(NT_processedc)
-
+  
   return(NT_compared)
 } #end of match_NT function  
 
@@ -1214,9 +1282,30 @@ match_qld <- function(APC_raw, APC_processed, QLD_processed){
   QLD_processed$Status_comparison <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   QLD_processed$Most_conservative_status <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+    
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_QLD <- QLD_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  QLD_processed$APC_name[pro_parte_modify_QLD]<- NA
+  QLD_processed$APC_canonical_name[pro_parte_modify_QLD]<- NA
+  QLD_processed$APC_Authorship[pro_parte_modify_QLD]<- NA
+  QLD_processed$APC_Alien_Status[pro_parte_modify_QLD]<- NA
+  QLD_processed$Status_comparison[pro_parte_modify_QLD]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  QLD_processed$Most_conservative_status[pro_parte_modify_QLD]<- QLD_processed$State_Alien_Status[pro_parte_modify_QLD]
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   QLDMost_conservative_status_df <- as.data.frame(QLD_processed[, c("Most_conservative_status")])
-  
   #add establishment_means
   QLD_processed$establishment_means <- apply(QLDMost_conservative_status_df, 1, state_establishment_means)
   #add degree_of_establishment
@@ -1328,6 +1417,29 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   SA_processed$Status_comparison <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   SA_processed$Most_conservative_status <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+   
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_SA <- SA_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  SA_processed$APC_name[pro_parte_modify_SA]<- NA
+  SA_processed$APC_canonical_name[pro_parte_modify_SA]<- NA
+  SA_processed$APC_Authorship[pro_parte_modify_SA]<- NA
+  SA_processed$APC_Alien_Status[pro_parte_modify_SA]<- NA
+  SA_processed$Status_comparison[pro_parte_modify_SA]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  SA_processed$Most_conservative_status[pro_parte_modify_SA]<- SA_processed$State_Alien_Status[pro_parte_modify_SA]
+  SA_processed$taxa_status[pro_parte_modify_SA]<- "pro parte misapplied"
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   SAMost_conservative_status_df <- as.data.frame(SA_processed[, c("Most_conservative_status")])
   #add establishment_means
@@ -1339,7 +1451,7 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   SA_processedc <- unnest(SA_processedb, degree_of_establishment, keep_empty = TRUE)
   #convert to df
   SA_compared <- as.data.frame(SA_processedc)
- 
+  
   return(SA_compared)
 } #end of match_SA function
 
@@ -1439,6 +1551,28 @@ match_tas <- function(APC_raw, APC_processed, TAS_processed) {
   TAS_processed$Status_comparison <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   TAS_processed$Most_conservative_status <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_TAS <- TAS_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  TAS_processed$APC_name[pro_parte_modify_TAS]<- NA
+  TAS_processed$APC_canonical_name[pro_parte_modify_TAS]<- NA
+  TAS_processed$APC_Authorship[pro_parte_modify_TAS]<- NA
+  TAS_processed$APC_Alien_Status[pro_parte_modify_TAS]<- NA
+  TAS_processed$Status_comparison[pro_parte_modify_TAS]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  TAS_processed$Most_conservative_status[pro_parte_modify_TAS]<- TAS_processed$State_Alien_Status[pro_parte_modify_TAS]
+  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   TASMost_conservative_status_df <- as.data.frame(TAS_processed[, c("Most_conservative_status")])
   #add establishment_means
@@ -1553,11 +1687,31 @@ match_vic <- function(APC_raw, APC_processed, VIC_processed) {
   VIC_processed$Most_conservative_status <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #no need to do further steps for Victoria, as it already includes establishment means and degree of establishment
   #rename for consistency
+  
   VIC_processedb <- unnest(VIC_processed, Most_conservative_status, keep_empty = TRUE)
   VIC_compared <- as.data.frame(VIC_processedb)
-  #VIC_encoded <- lapply(VIC_compared, iconv, to = "Latin1")
-  #VIC_encoded <- as.data.frame(VIC_encoded)
- 
+  
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_VIC <- VIC_compared$State_canonical_name %in% pro_parte$State_canonical_name
+  VIC_compared$APC_name[pro_parte_modify_VIC]<- NA
+  VIC_compared$APC_canonical_name[pro_parte_modify_VIC]<- NA
+  VIC_compared$APC_Authorship[pro_parte_modify_VIC]<- NA
+  VIC_compared$APC_Alien_Status[pro_parte_modify_VIC]<- NA
+  VIC_compared$Status_comparison[pro_parte_modify_VIC]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  VIC_compared$Most_conservative_status[pro_parte_modify_VIC]<- VIC_compared$State_Alien_Status[pro_parte_modify_VIC]
+  
   return(VIC_encoded)
 } #end of match_VIC function
 
@@ -1657,8 +1811,31 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
   WA_processed$Status_comparison <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
   WA_processed$Most_conservative_status <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  
+  #fix pro parte species that are impossible to assign to one species
+  pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
+                 "Epacris heteronema var. planifolia", "Epilobium glabellum", "Euphrasia brownii", "Gentiana montana", "Geranium dissectum var. australe",
+                 "Glycine clandestina var. sericea", "Helichrysum rutidolepis", "Hibbertia astrotricha", "Hibbertia billardierei", "Hibbertia densiflora",
+                 "Hibbertia stricta var. stricta", "Hibbertia stricta var. hirtiflora", "Hibiscus trionum", "Isoetes lacustris", "Lepidosperma laterale var. angustum",
+                 "Lepilaena preissii", "Monotoca scoparia var. submutica", "Myriophyllum elatinoides", "Myriophyllum propinquum", "Olearia sp. 2",
+                 "Oreomyrrhis andicola", "Pleurandra ovata", "Pleurandra sericea", "Poa australis", "Potamogeton natans", "Roepera latifolia", "Sauropus trachyspermus",
+                 "Senecio lautus subsp. maritimus", "Senecio pinnatifolius var. 2", "Stipa variabilis", "Styphelia virgata", "Taraxacum officinale",
+                 "Thelymitra porphyrosticta", "Trachymene australis", "Tritonia squalida", "Vittadinia australis", "Xanthium strumarium", "Zygophyllum billardierei",
+                 "Zygophyllum prismatothecum")
+  
+  pro_parte <- as.data.frame(pro_parte)
+  colnames(pro_parte)[1]<- "State_canonical_name"
+  pro_parte_modify_WA <- WA_processed$State_canonical_name %in% pro_parte$State_canonical_name
+  WA_processed$APC_name[pro_parte_modify_WA]<- NA
+  WA_processed$APC_canonical_name[pro_parte_modify_WA]<- NA
+  WA_processed$APC_Authorship[pro_parte_modify_WA]<- NA
+  WA_processed$APC_Alien_Status[pro_parte_modify_WA]<- NA
+  WA_processed$Status_comparison[pro_parte_modify_WA]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
+  WA_processed$Most_conservative_status[pro_parte_modify_WA]<- WA_processed$State_Alien_Status[pro_parte_modify_WA]
+ 
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
   WAMost_conservative_status_df <- as.data.frame(WA_processed[, c("Most_conservative_status")])
+  
   #add establishment_means
   WA_processed$establishment_means <- apply(WAMost_conservative_status_df, 1, state_establishment_means)
   #add degree_of_establishment
