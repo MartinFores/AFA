@@ -158,29 +158,44 @@ canonical_name_GRIIS2 <- function(x) {
 }
 
 compare_status <- function(x) { #where x will be a row of the input df
-  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
-  if(is.na(x[2])) {
-    return("Not listed on the APC with the name appearing on the state flora or listed but not recorded as present in this state")
+  #When taxa_status == "excluded"
+  if(!is.na(x[4])) if(x[4] == "excluded") {
+    return("Taxon excluded on the APC")
   }
-  
-  if(is.na(x[1])) {
-    return("Status not assigned on the state flora")
-  }
-  
-  # When similar status in both columns --> write "Similar in state flora and APC"
-  if(x[1] == x[2]) {
-    return("Similar for the state flora and the APC")
-  }
-  # When differing --> write "According to the state flora is (copy --> State_Alien_Status), while according to the APC is (copy --> APC_Alien_Status)"
-  if(x[1] != x[2]) {
-    return(paste0("According to the state flora is ", x[1], ", while according to the APC is ", x[2]))
+  if(is.na(x[4]) | x[4] != "excluded") {
+    # When NA in APC_Alien_Status --> write "Not listed on the APC with the name appearing on the state flora"
+    if(is.na(x[3])) {
+      return("Not listed on the APC with the name appearing on the state flora")
+    }
+    #When NA in APC_name --> write Not recorded on the APC as present in this state"
+    if(!is.na(x[3]) && is.na(x[2])) {
+      return("Not recorded on the APC as present in this state")
+    } 
+    #When State_Alien_Status is NA
+    if(is.na(x[1])) {
+      return("Status not assigned on the state flora")
+    }
+    # When similar status in both columns --> write "Similar in state flora and APC"
+   if(x[1] == x[2]) {
+      return("Similar for the state flora and the APC")
+    }
+    # When differing --> write "According to the state flora is (copy --> State_Alien_Status), while according to the APC is (copy --> APC_Alien_Status)"
+    if(x[1] != x[2]) {
+      return(paste0("According to the state flora is ", x[1], ", while according to the APC is ", x[2]))
+    }
   }
 }
 
 #function to return most conservative status
 state_conservative_status <- function(x) { #where x will be a row of the input df
   # When NA in APC_Alien_Status, copy status from state census
-  if(x[3] == "Not listed on the APC with the name appearing on the state flora or listed but not recorded as present in this state") {
+  if(x[3] == "Taxon excluded on the APC") {
+    return(paste0(x[1]))
+  }
+  if(x[3] == "Not listed on the APC with the name appearing on the state flora") {
+    return(paste0(x[1]))
+  }
+  if(x[3] == "Not recorded on the APC as present in this state") {
     return(paste0(x[1]))
   }
   # When similar status in both columns, copy status from state census
@@ -494,6 +509,7 @@ national_degree_of_establishment <- function(x) {
 }
 
 ###########CROSS APC TAXONOMY WITH GBIF AND WFO############
+#get canonical name
 cross_GBIF <- function(dataset) {
   cat('Starting cross reference process with GBIF. This can take some time')
   column_name <- colnames(dataset) [grep("canonical", colnames(dataset))]
@@ -549,3 +565,7 @@ escape_curation_tasmania <- function(x) {
     return(paste0(x[2]))
   }
  }
+
+#########################################
+#end of secondary functions
+#########################################
