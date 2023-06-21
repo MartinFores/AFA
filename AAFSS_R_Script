@@ -1,3 +1,4 @@
+
 #################################
 ##Australian Alien Flora Standardized System (AAFSS): a powerful tool to facilitate management and decision making on biological invasions and biosecurity.
 ##Martín-Forés, I., Guerin, G.R., Lewis, D., Gallagher, R.V., Vilà, M., Catford, J., Pauchard, A. & Sparrow, B.
@@ -41,7 +42,7 @@
 
 #Download and save the R source file AAFSS_functions.R and AAFSS_secondary_functions.R to your working directory
 
-#Warning: for step 2, you must choose the fileEncoding specified for each of the datasets to make the matching process work
+#WARNING: for step 2, you must choose the fileEncoding specified for each of the datasets to make the matching process work
 #2. Load the input census data files into your workspace as follows (sometimes using UTF-8 encoding and sometimes Latin1, depending on particularities of the dataset):
 APC_raw <- read.csv("APC_original.csv", header = TRUE, sep = ",", fileEncoding = "UTF-8")
 ACT <- read.csv("plant_census_ACT.csv", header = TRUE, sep = ",", na.strings=c("","NA"), fileEncoding = "Latin1")
@@ -58,7 +59,7 @@ distribution_griis <- read.csv("distribution_griis.csv", header = TRUE, sep = ",
 
 
 #3. Load the source into your R workspace
-source('AAFSS_main_functions.R')
+source('AAFSS_main_functions2.R')
 source('AAFSS_secondary_functions.R')
 
 #4. Load required packages
@@ -102,12 +103,10 @@ AAFSS_WA_state_dataset <- match_wa(APC_raw, APC_processed, WA_processed)
 
 #8. Create the national dataset
 AAFSS_national_dataset <- national_alien_flora(APC_processed, AAFSS_ACT_state_dataset, AAFSS_NSW_state_dataset, AAFSS_NT_state_dataset, AAFSS_QLD_state_dataset, AAFSS_SA_state_dataset, AAFSS_TAS_state_dataset, AAFSS_VIC_state_dataset, AAFSS_WA_state_dataset, GRIIS_processed)
-#warning! If saving AAFSS_national_dataset "Latin1" encoding must be used to avoid weird symbols.
 
-#8. Fix manually pro-parte species by contrasting information with APC_raw
-
-#9. Optional: Saving the datasets in your directory and reload them once the pro parte species are fixed. 
+#8. Optional: Saving the datasets in your directory and reload them once the pro parte species are fixed. 
 #WARNING! If saving the datasets, you must use specific fileEncoding "Latin1" to avoid strange characters for all states except for Victoria. Victoria must be saved with UTF-8 encoding.
+#WARNING! If saving AAFSS_national_dataset "Latin1" encoding must be used to avoid weird symbols.
 #If reloading them again, fileEncoding must be set to the same specified for saving.
 
 ##############################
