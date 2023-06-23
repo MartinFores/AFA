@@ -59,7 +59,7 @@ distribution_griis <- read.csv("distribution_griis.csv", header = TRUE, sep = ",
 
 
 #3. Load the source into your R workspace
-source('AAFSS_main_functions2.R')
+source('AAFSS_main_functions.R')
 source('AAFSS_secondary_functions.R')
 
 #4. Load required packages
