@@ -497,8 +497,10 @@ national_degree_of_establishment <- function(x) {
      x[1] == introduced && x[2] == "doubtfully naturalised") {
     return(paste0("established"))
   }
-  if(x[1] == introduced && x[2] == "introduced"||  
-     x[1] == introduced && x[2] == "doubtfully introduced"||  
+  if(x[1] == introduced && x[2] == "harmful invasive") {
+    return(paste0("invasive"))
+  }
+  if(x[1] == introduced && x[2] == "introduced"||    
      x[1] == introduced && x[2] == "formerly naturalised"||  
      x[1] == introduced && x[2] == "formerly introduced"){
     return(paste0("not enough information to assign degree of establishment"))
