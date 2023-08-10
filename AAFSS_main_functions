@@ -1988,9 +1988,9 @@ national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_N
   
   #function for equivalences with DC terminology establishment means for status at the national scale
   #convert national status to a df to create DC equivalences
-  #national_status_df <- as.data.frame(APC_processed[, c("National_Status")])
-  APC_processed$establishment_means <- sapply(APC_processed[, c("National_Status")], national_establishment_means)
-  APC_processed$degree_of_establishment <- sapply(APC_processed[, c("establishment_means", "National_Status")], national_degree_of_establishment)
+  #national_status_df <- as.data.frame(APC_processed[, c("AAFSS_Alien_status")])
+  APC_processed$establishment_means <- sapply(APC_processed[, c("AAFSS_Alien_status")], national_establishment_means)
+  APC_processed$degree_of_establishment <- sapply(APC_processed[, c("establishment_means", "AAFSS_Alien_status")], national_degree_of_establishment)
   AAFSS <- subset(APC_processed, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_most_conservative', 'NSW_most_conservative', 'NT_most_conservative', 'QLD_most_conservative', 'SA_most_conservative', 'TAS_most_conservative', 'VIC_most_conservative',	'WA_most_conservative', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AAFSS_Alien_status', 'establishment_means', 'degree_of_establishment'))
   
   if("GBIF_name" %in% colnames(APC_processed)){
