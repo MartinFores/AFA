@@ -1,12 +1,12 @@
 
 #################################
-##Australian Alien Flora Standardized System (AAFSS): a powerful tool to facilitate management and decision making on biological invasions and biosecurity.
+##The Alien Flora of Australia (AFA), a unified Australian national dataset on plant invasion
 ##Martín-Forés, I., Guerin, G.R., Lewis, D., Gallagher, R.V., Vilà, M., Catford, J., Pauchard, A. & Sparrow, B.
-##Supplementary material S3. R script associated with AAFSS.
+##R script developed to create the AFA.
 ##This R script combines the Australian Plant Census (APC) with all the Australian state and main territory flora censuses in order to detect mismatches between species nomenclature and introduction status accross Australia. 
 ##The script can be used with future releases of the APC or any of the state floras, to automatize this process in the future, as long as the format is the same for the source datasets. 
 ##The script follows the APC taxonomy as the most recognised authority of taxonomic nomenclature for Australian flora, however it also incorporated standardised nomenclature from GBIF and WFO in order to adapt the tool to other international plant taxonomy sources. 
-##The introduction status recorded in the outcome is based on Blackburn et al. (2011). Species are therefore classified in the AAFSS as native, native colonising or native potentially colonising (when they were also introduced or potentially introduced, respectively within the same state or territory of origin), introduced, naturalised (when forming self-sustaining populations) – we also stated whether, for the two former ones, the status was doubtfully or formerly when that was the case –, harmful invasive (when recorded as invasive causing negative impacts according to the Australian Globar Registry of Introduced and Invasive Species (GRIIS)), presumed extinct, or uncertain origin. 
+##The introduction status recorded in the outcome is based on Blackburn et al. (2011) and the integration on invasion information across Australia conducted by Martín-Forés et al. (2023). Species are therefore classified in the AFA as native, native colonising or native potentially colonising (when they were also introduced or potentially introduced, respectively within the same state or territory of origin), introduced, naturalised (when forming self-sustaining populations) – we also stated whether, for the two former ones, the status was doubtfully or formerly when that was the case –, harmful invasive (when recorded as invasive causing negative impacts according to the Australian Globar Registry of Introduced and Invasive Species (GRIIS)), presumed extinct, or uncertain origin. 
 ################################
 
 #####################
