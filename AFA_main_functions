@@ -1,4 +1,4 @@
-#AAFSS_main_functions.R
+#AF_main_functions.R
 ###############################################
 
 #source functions:
@@ -871,7 +871,7 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   #add status comparison
   ACT_processed$Status_comparison <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  ACT_processed$Most_conservative_status <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  ACT_processed$Unified_status <- apply(ACT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
 
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -892,16 +892,16 @@ match_act <- function(APC_raw, APC_processed, ACT_processed) {
   ACT_processed$APC_Authorship[pro_parte_modify_ACT]<- NA
   ACT_processed$APC_Alien_Status[pro_parte_modify_ACT]<- NA
   ACT_processed$Status_comparison[pro_parte_modify_ACT]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  ACT_processed$Most_conservative_status[pro_parte_modify_ACT]<- ACT_processed$State_Alien_Status[pro_parte_modify_ACT]
+  ACT_processed$Unified_status[pro_parte_modify_ACT]<- ACT_processed$State_Alien_Status[pro_parte_modify_ACT]
   ACT_processed$taxa_status[pro_parte_modify_ACT]<- "pro parte misapplied"
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  ACTMost_conservative_status_df <- as.data.frame(ACT_processed[, c("Most_conservative_status")])
+  ACTUnified_status_df <- as.data.frame(ACT_processed[, c("Unified_status")])
   
   #add establishment_means
-  ACT_processed$establishment_means <- apply(ACTMost_conservative_status_df, 1, state_establishment_means)
+  ACT_processed$establishment_means <- apply(ACTUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  ACT_processed$degree_of_establishment <- apply(ACTMost_conservative_status_df, 1, state_degree_of_establishment)
+  ACT_processed$degree_of_establishment <- apply(ACTUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   ACT_processedb <- unnest(ACT_processed, establishment_means, keep_empty = TRUE)
   ACT_processedc <- unnest(ACT_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1008,8 +1008,8 @@ match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
   #add status comparison
   NSW_processed$Status_comparison <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  NSW_processed$Most_conservative_status <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
-  Most_con <- unnest(NSW_processed, Most_conservative_status, keep_empty = TRUE)
+  NSW_processed$Unified_status <- apply(NSW_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  Most_con <- unnest(NSW_processed, Unified_status, keep_empty = TRUE)
   NSW_processedb <- as.data.frame(Most_con)
   
   #fix pro parte species that are impossible to assign to one species
@@ -1031,14 +1031,14 @@ match_nsw <- function(APC_raw, APC_processed, NSW_processed) {
   NSW_processedb$APC_Authorship[pro_parte_modify_NSW]<- NA
   NSW_processedb$APC_Alien_Status[pro_parte_modify_NSW]<- NA
   NSW_processedb$Status_comparison[pro_parte_modify_NSW]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  NSW_processedb$Most_conservative_status[pro_parte_modify_NSW]<- NSW_processedb$State_Alien_Status[pro_parte_modify_NSW]
+  NSW_processedb$Unified_status[pro_parte_modify_NSW]<- NSW_processedb$State_Alien_Status[pro_parte_modify_NSW]
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  NSWMost_conservative_status_df <- as.data.frame(NSW_processedb[, c("Most_conservative_status")])
+  NSWUnified_status_df <- as.data.frame(NSW_processedb[, c("Unified_status")])
   #add establishment_means
-  NSW_processedb$establishment_means <- apply(NSWMost_conservative_status_df, 1, state_establishment_means)
+  NSW_processedb$establishment_means <- apply(NSWUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  NSW_processedb$degree_of_establishment <- apply(NSWMost_conservative_status_df, 1, state_degree_of_establishment)
+  NSW_processedb$degree_of_establishment <- apply(NSWUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   NSW_processedc <- unnest(NSW_processedb, establishment_means, keep_empty = TRUE)
   NSW_processedd <- unnest(NSW_processedc, degree_of_establishment, keep_empty = TRUE)
@@ -1145,7 +1145,7 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   #add status comparison
   NT_processed$Status_comparison <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  NT_processed$Most_conservative_status <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  NT_processed$Unified_status <- apply(NT_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
 
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -1166,15 +1166,15 @@ match_nt <- function(APC_raw, APC_processed, NT_processed){
   NT_processed$APC_Authorship[pro_parte_modify_NT]<- NA
   NT_processed$APC_Alien_Status[pro_parte_modify_NT]<- NA
   NT_processed$Status_comparison[pro_parte_modify_NT]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  NT_processed$Most_conservative_status[pro_parte_modify_NT]<- NT_processed$State_Alien_Status[pro_parte_modify_NT]
+  NT_processed$Unified_status[pro_parte_modify_NT]<- NT_processed$State_Alien_Status[pro_parte_modify_NT]
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  NTMost_conservative_status_df <- as.data.frame(NT_processed[, c("Most_conservative_status")])
+  NTUnified_status_df <- as.data.frame(NT_processed[, c("Unified_status")])
   
   #add establishment_means
-  NT_processed$establishment_means <- apply(NTMost_conservative_status_df, 1, state_establishment_means)
+  NT_processed$establishment_means <- apply(NTUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  NT_processed$degree_of_establishment <- apply(NTMost_conservative_status_df, 1, state_degree_of_establishment)
+  NT_processed$degree_of_establishment <- apply(NTUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   NT_processedb <- unnest(NT_processed, establishment_means, keep_empty = TRUE)
   NT_processedc <- unnest(NT_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1281,7 +1281,7 @@ match_qld <- function(APC_raw, APC_processed, QLD_processed){
   #add status comparison
   QLD_processed$Status_comparison <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  QLD_processed$Most_conservative_status <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  QLD_processed$Unified_status <- apply(QLD_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
     
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -1302,14 +1302,14 @@ match_qld <- function(APC_raw, APC_processed, QLD_processed){
   QLD_processed$APC_Authorship[pro_parte_modify_QLD]<- NA
   QLD_processed$APC_Alien_Status[pro_parte_modify_QLD]<- NA
   QLD_processed$Status_comparison[pro_parte_modify_QLD]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  QLD_processed$Most_conservative_status[pro_parte_modify_QLD]<- QLD_processed$State_Alien_Status[pro_parte_modify_QLD]
+  QLD_processed$Unified_status[pro_parte_modify_QLD]<- QLD_processed$State_Alien_Status[pro_parte_modify_QLD]
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  QLDMost_conservative_status_df <- as.data.frame(QLD_processed[, c("Most_conservative_status")])
+  QLDUnified_status_df <- as.data.frame(QLD_processed[, c("Unified_status")])
   #add establishment_means
-  QLD_processed$establishment_means <- apply(QLDMost_conservative_status_df, 1, state_establishment_means)
+  QLD_processed$establishment_means <- apply(QLDUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  QLD_processed$degree_of_establishment <- apply(QLDMost_conservative_status_df, 1, state_degree_of_establishment)
+  QLD_processed$degree_of_establishment <- apply(QLDUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   QLD_processedb <- unnest(QLD_processed, establishment_means, keep_empty = TRUE)
   QLD_processedc <- unnest(QLD_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1416,7 +1416,7 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   #add status comparison
   SA_processed$Status_comparison <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  SA_processed$Most_conservative_status <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  SA_processed$Unified_status <- apply(SA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
    
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -1437,15 +1437,15 @@ match_sa <- function(APC_raw, APC_processed, SA_processed) {
   SA_processed$APC_Authorship[pro_parte_modify_SA]<- NA
   SA_processed$APC_Alien_Status[pro_parte_modify_SA]<- NA
   SA_processed$Status_comparison[pro_parte_modify_SA]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  SA_processed$Most_conservative_status[pro_parte_modify_SA]<- SA_processed$State_Alien_Status[pro_parte_modify_SA]
+  SA_processed$Unified_status[pro_parte_modify_SA]<- SA_processed$State_Alien_Status[pro_parte_modify_SA]
   SA_processed$taxa_status[pro_parte_modify_SA]<- "pro parte misapplied"
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  SAMost_conservative_status_df <- as.data.frame(SA_processed[, c("Most_conservative_status")])
+  SAUnified_status_df <- as.data.frame(SA_processed[, c("Unified_status")])
   #add establishment_means
-  SA_processed$establishment_means <- apply(SAMost_conservative_status_df, 1, state_establishment_means)
+  SA_processed$establishment_means <- apply(SAUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  SA_processed$degree_of_establishment <- apply(SAMost_conservative_status_df, 1, state_degree_of_establishment)
+  SA_processed$degree_of_establishment <- apply(SAUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   SA_processedb <- unnest(SA_processed, establishment_means, keep_empty = TRUE)
   SA_processedc <- unnest(SA_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1550,7 +1550,7 @@ match_tas <- function(APC_raw, APC_processed, TAS_processed) {
   #add status comparison
   TAS_processed$Status_comparison <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  TAS_processed$Most_conservative_status <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  TAS_processed$Unified_status <- apply(TAS_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -1571,14 +1571,14 @@ match_tas <- function(APC_raw, APC_processed, TAS_processed) {
   TAS_processed$APC_Authorship[pro_parte_modify_TAS]<- NA
   TAS_processed$APC_Alien_Status[pro_parte_modify_TAS]<- NA
   TAS_processed$Status_comparison[pro_parte_modify_TAS]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  TAS_processed$Most_conservative_status[pro_parte_modify_TAS]<- TAS_processed$State_Alien_Status[pro_parte_modify_TAS]
+  TAS_processed$Unified_status[pro_parte_modify_TAS]<- TAS_processed$State_Alien_Status[pro_parte_modify_TAS]
   
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  TASMost_conservative_status_df <- as.data.frame(TAS_processed[, c("Most_conservative_status")])
+  TASUnified_status_df <- as.data.frame(TAS_processed[, c("Unified_status")])
   #add establishment_means
-  TAS_processed$establishment_means <- apply(TASMost_conservative_status_df, 1, state_establishment_means)
+  TAS_processed$establishment_means <- apply(TASUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  TAS_processed$degree_of_establishment <- apply(TASMost_conservative_status_df, 1, state_degree_of_establishment)
+  TAS_processed$degree_of_establishment <- apply(TASUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   TAS_processedb <- unnest(TAS_processed, establishment_means, keep_empty = TRUE)
   TAS_processedc <- unnest(TAS_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1684,11 +1684,11 @@ match_vic <- function(APC_raw, APC_processed, VIC_processed) {
   #add status comparison
   VIC_processed$Status_comparison <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  VIC_processed$Most_conservative_status <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  VIC_processed$Unified_status <- apply(VIC_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   #no need to do further steps for Victoria, as it already includes establishment means and degree of establishment
   #rename for consistency
   
-  VIC_processedb <- unnest(VIC_processed, Most_conservative_status, keep_empty = TRUE)
+  VIC_processedb <- unnest(VIC_processed, Unified_status, keep_empty = TRUE)
   VIC_compared <- as.data.frame(VIC_processedb)
   
   #fix pro parte species that are impossible to assign to one species
@@ -1710,7 +1710,7 @@ match_vic <- function(APC_raw, APC_processed, VIC_processed) {
   VIC_compared$APC_Authorship[pro_parte_modify_VIC]<- NA
   VIC_compared$APC_Alien_Status[pro_parte_modify_VIC]<- NA
   VIC_compared$Status_comparison[pro_parte_modify_VIC]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  VIC_compared$Most_conservative_status[pro_parte_modify_VIC]<- VIC_compared$State_Alien_Status[pro_parte_modify_VIC]
+  VIC_compared$Unified_status[pro_parte_modify_VIC]<- VIC_compared$State_Alien_Status[pro_parte_modify_VIC]
   
   return(VIC_encoded)
 } #end of match_VIC function
@@ -1810,7 +1810,7 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
   #add status comparison
   WA_processed$Status_comparison <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "APC_name", "taxa_status")], 1, compare_status)
   #add most conservative status
-  WA_processed$Most_conservative_status <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
+  WA_processed$Unified_status <- apply(WA_processed[, c("State_Alien_Status", "APC_Alien_Status", "Status_comparison")], 1, state_conservative_status)
   
   #fix pro parte species that are impossible to assign to one species
   pro_parte <- c("Apium australe", "Astrotricha sp. 1", "Carissa spinarum", "Cleome microaustralica", "Cleome viscosa", "Daviesia benthamii subsp. humilis",
@@ -1831,15 +1831,15 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
   WA_processed$APC_Authorship[pro_parte_modify_WA]<- NA
   WA_processed$APC_Alien_Status[pro_parte_modify_WA]<- NA
   WA_processed$Status_comparison[pro_parte_modify_WA]<- "It corresponds to several accepted names on the APC due to have been pro parte misapplied, therefore it is impossible to assign one"
-  WA_processed$Most_conservative_status[pro_parte_modify_WA]<- WA_processed$State_Alien_Status[pro_parte_modify_WA]
+  WA_processed$Unified_status[pro_parte_modify_WA]<- WA_processed$State_Alien_Status[pro_parte_modify_WA]
  
   #create df with conservative status to add establishment means and degree of establishment. We'll have to unnest it after
-  WAMost_conservative_status_df <- as.data.frame(WA_processed[, c("Most_conservative_status")])
+  WAUnified_status_df <- as.data.frame(WA_processed[, c("Unified_status")])
   
   #add establishment_means
-  WA_processed$establishment_means <- apply(WAMost_conservative_status_df, 1, state_establishment_means)
+  WA_processed$establishment_means <- apply(WAUnified_status_df, 1, state_establishment_means)
   #add degree_of_establishment
-  WA_processed$degree_of_establishment <- apply(WAMost_conservative_status_df, 1, state_degree_of_establishment)
+  WA_processed$degree_of_establishment <- apply(WAUnified_status_df, 1, state_degree_of_establishment)
   #unnest both variables
   WA_processedb <- unnest(WA_processed, establishment_means, keep_empty = TRUE)
   WA_processedc <- unnest(WA_processedb, degree_of_establishment, keep_empty = TRUE)
@@ -1853,36 +1853,36 @@ match_wa <- function(APC_raw, APC_processed, WA_processed) {
 national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_NSW_state_dataset, AAFSS_NT_state_dataset, AAFSS_QLD_state_dataset, AAFSS_SA_state_dataset, AAFSS_TAS_state_dataset, AAFSS_VIC_state_dataset, AAFSS_WA_state_dataset, GRIIS_processed){
   
   #ACT
-  APC_processed$ACT_most_conservative <- as.character(AAFSS_ACT_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_ACT_state_dataset$APC_canonical_name))]
-  APC_processed$ACT_most_conservative[which(is.na(APC_processed$ACT_most_conservative))] <- as.character(APC_processed$ACT)[which(is.na(APC_processed$ACT_most_conservative))]
+  APC_processed$ACT_unified <- as.character(AAFSS_ACT_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_ACT_state_dataset$APC_canonical_name))]
+  APC_processed$ACT_Unified[which(is.na(APC_processed$ACT_Unified))] <- as.character(APC_processed$ACT)[which(is.na(APC_processed$ACT_unified))]
   
   #NSW#
-  APC_processed$NSW_most_conservative <- as.character(AAFSS_NSW_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NSW_state_dataset$APC_canonical_name))]
-  APC_processed$NSW_most_conservative[which(is.na(APC_processed$NSW_most_conservative))] <- as.character(APC_processed$NSW)[which(is.na(APC_processed$NSW_most_conservative))]
+  APC_processed$NSW_unified <- as.character(AAFSS_NSW_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NSW_state_dataset$APC_canonical_name))]
+  APC_processed$NSW_unified[which(is.na(APC_processed$NSW_unified))] <- as.character(APC_processed$NSW)[which(is.na(APC_processed$NSW_unified))]
   
   #NT#
-  APC_processed$NT_most_conservative <- as.character(AAFSS_NT_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NT_state_dataset$APC_canonical_name))]
-  APC_processed$NT_most_conservative[which(is.na(APC_processed$NT_most_conservative))] <- as.character(APC_processed$NT)[which(is.na(APC_processed$NT_most_conservative))]
+  APC_processed$NT_unified <- as.character(AAFSS_NT_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_NT_state_dataset$APC_canonical_name))]
+  APC_processed$NT_unified[which(is.na(APC_processed$NT_unified))] <- as.character(APC_processed$NT)[which(is.na(APC_processed$NT_unified))]
   
   #QLD#
-  APC_processed$QLD_most_conservative <- as.character(AAFSS_QLD_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_QLD_state_dataset$APC_canonical_name))]
-  APC_processed$QLD_most_conservative[which(is.na(APC_processed$QLD_most_conservative))] <- as.character(APC_processed$Qld)[which(is.na(APC_processed$QLD_most_conservative))]
+  APC_processed$QLD_unified <- as.character(AAFSS_QLD_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_QLD_state_dataset$APC_canonical_name))]
+  APC_processed$QLD_unified[which(is.na(APC_processed$QLD_unified))] <- as.character(APC_processed$Qld)[which(is.na(APC_processed$QLD_unified))]
   
   #SA#
-  APC_processed$SA_most_conservative <- as.character(AAFSS_SA_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_SA_state_dataset$APC_canonical_name))]
-  APC_processed$SA_most_conservative[which(is.na(APC_processed$SA_most_conservative))] <- as.character(APC_processed$SA)[which(is.na(APC_processed$SA_most_conservative))]
+  APC_processed$SA_unified <- as.character(AAFSS_SA_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_SA_state_dataset$APC_canonical_name))]
+  APC_processed$SA_unified[which(is.na(APC_processed$SA_unified))] <- as.character(APC_processed$SA)[which(is.na(APC_processed$SA_unified))]
   
   #TAS#
-  APC_processed$TAS_most_conservative <- as.character(AAFSS_TAS_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_TAS_state_dataset$APC_canonical_name))]
-  APC_processed$TAS_most_conservative[which(is.na(APC_processed$TAS_most_conservative))] <- as.character(APC_processed$Tas)[which(is.na(APC_processed$TAS_most_conservative))]
+  APC_processed$TAS_unified <- as.character(AAFSS_TAS_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_TAS_state_dataset$APC_canonical_name))]
+  APC_processed$TAS_unified[which(is.na(APC_processed$TAS_unified))] <- as.character(APC_processed$Tas)[which(is.na(APC_processed$TAS_unified))]
   
   #VIC#
-  APC_processed$VIC_most_conservative <- as.character(AAFSS_VIC_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_VIC_state_dataset$APC_canonical_name))]
-  APC_processed$VIC_most_conservative[which(is.na(APC_processed$VIC_most_conservative))] <- as.character(APC_processed$Vic)[which(is.na(APC_processed$VIC_most_conservative))]
+  APC_processed$VIC_unified <- as.character(AAFSS_VIC_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_VIC_state_dataset$APC_canonical_name))]
+  APC_processed$VIC_unified[which(is.na(APC_processed$VIC_unified))] <- as.character(APC_processed$Vic)[which(is.na(APC_processed$VIC_unified))]
   
   #WA#
-  APC_processed$WA_most_conservative <- as.character(AAFSS_WA_state_dataset$Most_conservative_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_WA_state_dataset$APC_canonical_name))]
-  APC_processed$WA_most_conservative[which(is.na(APC_processed$WA_most_conservative))] <- as.character(APC_processed$WA)[which(is.na(APC_processed$WA_most_conservative))]
+  APC_processed$WA_unified <- as.character(AAFSS_WA_state_dataset$Unified_status)[match(APC_processed$APC_canonical_name, as.character(AAFSS_WA_state_dataset$APC_canonical_name))]
+  APC_processed$WA_unified[which(is.na(APC_processed$WA_unified))] <- as.character(APC_processed$WA)[which(is.na(APC_processed$WA_unified))]
   
   #associate exact string to names we want to use
   native <- c("native")
@@ -1899,27 +1899,27 @@ national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_N
   
   #count, for each species, and for each introduction status, if there are recorded as such across states and main territories. If recorded as such we will obtain "1" regardless of in how many states or territories it appears with such status
   #count if recorded as native in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countNative <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native %in% x))
+  APC_processed$countNative <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(native %in% x))
   #count if recorded as native potentially colonising in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countNative_colonising_potential <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native_colonising_potential %in% x))
+  APC_processed$countNative_colonising_potential <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(native_colonising_potential %in% x))
   #count if recorded as native colonising in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countNative_colonising <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(native_colonising %in% x))
+  APC_processed$countNative_colonising <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(native_colonising %in% x))
   #count if recorded as having uncertain origin in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countUncertain <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(uncertain %in% x))
+  APC_processed$countUncertain <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(uncertain %in% x))
   #count if recorded as naturalised in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countNaturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(naturalised %in% x))
+  APC_processed$countNaturalised <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(naturalised %in% x))
   #count if recorded as doubtfully naturalised in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countdoubtfully_naturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(doubtfully_naturalised %in% x))
+  APC_processed$countdoubtfully_naturalised <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(doubtfully_naturalised %in% x))
   #count if recorded as introduced in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countIntroduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(introduced %in% x))
+  APC_processed$countIntroduced <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(introduced %in% x))
   #count if recorded as doubtfully introduced in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countdoubtfully_introduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(doubtfully_introduced %in% x))
+  APC_processed$countdoubtfully_introduced <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(doubtfully_introduced %in% x))
   #count if recorded as formerly naturalised in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countformerly_naturalised <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(formerly_naturalised %in% x))
+  APC_processed$countformerly_naturalised <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(formerly_naturalised %in% x))
   #count if recorded as presumed extinct in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countpresumed_extinct <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(presumed_extinct %in% x))
+  APC_processed$countpresumed_extinct <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(presumed_extinct %in% x))
   #count if recorded as formerly introduced in any state or main territory. 1 if yes, 0 if not.
-  APC_processed$countformerly_introduced <- apply(APC_processed[,grep("conservative", colnames(APC_processed))], 1, function(x) sum(formerly_introduced %in% x))
+  APC_processed$countformerly_introduced <- apply(APC_processed[,grep("unified", colnames(APC_processed))], 1, function(x) sum(formerly_introduced %in% x))
   
   #change ones (1) for strings that we want to use
   APC_processed$countNative[APC_processed$countNative=="1"] <- "native"
@@ -1984,25 +1984,25 @@ national_alien_flora <- function(APC_processed, AAFSS_ACT_state_dataset, AAFSS_N
   APC_processed$GRIIS_comparison <- apply(APC_processed[, c("National_Status", "GRIIS_Alien_Status")], 1, compare_status_GRIIS)
   
   #add national status product of our AusAFW
-  APC_processed$AAFSS_Alien_status <- apply(APC_processed[, c("National_Status", "GRIIS_Alien_Status", "GRIIS_comparison")], 1, return_conservative_status_GRIIS)
+  APC_processed$AFA_unified_status <- apply(APC_processed[, c("National_Status", "GRIIS_Alien_Status", "GRIIS_comparison")], 1, return_conservative_status_GRIIS)
   
   #function for equivalences with DC terminology establishment means for status at the national scale
   #convert national status to a df to create DC equivalences
-  #national_status_df <- as.data.frame(APC_processed[, c("AAFSS_Alien_status")])
-  APC_processed$establishment_means <- sapply(APC_processed[, c("AAFSS_Alien_status")], national_establishment_means)
-  APC_processed$degree_of_establishment <- sapply(APC_processed[, c("establishment_means", "AAFSS_Alien_status")], national_degree_of_establishment)
-  AAFSS <- subset(APC_processed, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_most_conservative', 'NSW_most_conservative', 'NT_most_conservative', 'QLD_most_conservative', 'SA_most_conservative', 'TAS_most_conservative', 'VIC_most_conservative',	'WA_most_conservative', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AAFSS_Alien_status', 'establishment_means', 'degree_of_establishment'))
+  #national_status_df <- as.data.frame(APC_processed[, c("AFA_unified_status")])
+  APC_processed$establishment_means <- sapply(APC_processed[, c("AFA_unified_status")], national_establishment_means)
+  APC_processed$degree_of_establishment <- sapply(APC_processed[, c("establishment_means", "AFA_unified_status")], national_degree_of_establishment)
+  AFA <- subset(APC_processed, select=c('APC_canonical_name', 'APC_name', 'Author', 'rank', 'taxa_status', 'taxaID', 'ACT_unified', 'NSW_unified', 'NT_unified', 'QLD_unified', 'SA_unified', 'TAS_unified', 'VIC_unified',	'WA_unified', 'AR', 'CoI', 'CaI', 'ChI', 'LHI', 'NI', 'HI', 'CSI', 'MDI', 'National_Status', 'GRIIS_Alien_Status', 'GRIIS_comparison', 'AFA_unified_status', 'establishment_means', 'degree_of_establishment'))
   
   if("GBIF_name" %in% colnames(APC_processed)){
   GBIF <- subset(APC_processed, select=c('GBIF_name', 'GBIF_canon_name'))
-  AAFSS <- cbind(AAFSS, GBIF)
+  AFA <- cbind(AFA, GBIF)
   }
   
   if("WFO_name" %in% colnames(APC_processed)){
   WFO <- subset(APC_processed, select=c('WFO_name', 'WFO_canon_name'))
-  AAFSS <- cbind(AAFSS, WFO)
+  AFA <- cbind(AFA, WFO)
   }
-  return(AAFSS) #alternatively, if you want the further modified state objects returned to user as well, either split up into a function per state for matching and return that state here, or run the whole thing but return a list with e.g., $AusAFW, $WA2022, $NSW2022, ... etc
+  return(AFA) #alternatively, if you want the further modified state objects returned to user as well, either split up into a function per state for matching and return that state here, or run the whole thing but return a list with e.g., $AusAFW, $WA2022, $NSW2022, ... etc
   }#end of function
 
 #end of script
