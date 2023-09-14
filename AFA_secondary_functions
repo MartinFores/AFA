@@ -1,4 +1,4 @@
-#Source functions for AAFSS. Saved as AAFSS_secondary_functions.R
+#Source functions for the AFA. Saved as AFA_secondary_functions.R
 
 #Function to create canonical name from variables provided on the ACT plant cesus
 canonical_name_for_ACT <- function(x) {
@@ -350,7 +350,7 @@ state_establishment_means <- function(x) { #where x will be a row of the input d
      x[1]  == "formerly introduced"){
     return(paste0("not enough information to assign establishment means"))
   }
-  if(x[1]  == "listed in APC but not recorded anywhere"|| 
+  if(x[1]  == "listed on the APC but not recorded anywhere"|| 
      x[1]  == "recorded only in external territories"){
     return(NA)
   }
@@ -387,7 +387,7 @@ state_degree_of_establishment <- function(x) {
 
 #function to compare the status we elucidated at national scale with the one recorded on the GRIIS
 compare_status_GRIIS <- function(x) { #where x will be a row of the input df
-  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  # When NA in APC_Alien_Status --> write "Not listed on the APC with the name appearing in the state flora or listed but not recorded as present in this state"
   if(is.na(x[2])) {
     return("Not listed on the GRIIS with the name appearing on the APC or not recorded as introduced at the national scale")
   }
@@ -396,11 +396,11 @@ compare_status_GRIIS <- function(x) { #where x will be a row of the input df
   }
   # When similar status in both columns --> write "Similar in state flora and APC"
   if(x[1] == x[2]) {
-    return("Similar for the APC and the GRIIS")
+    return("Similar for our national status and the GRIIS")
   }
   # When differing --> write "According to the state flora is (copy --> State_Alien_Status), while according to the APC is (copy --> APC_Alien_Status)"
   if(x[1] != x[2]) {
-    return(paste0("According to the APC is ", x[1], ", while according to the GRIIS is ", x[2]))
+    return(paste0("According to our national status is ", x[1], ", while according to the GRIIS is ", x[2]))
   }
 }
 
@@ -415,32 +415,32 @@ return_conservative_status_GRIIS <- function(x) { #where x will be a row of the 
   }
   
   # When similar status in both columns --> write "Similar in state flora and APC"
-  if(x[3] == "Similar for the APC and the GRIIS") {
+  if(x[3] == "Similar for our national status and the GRIIS") {
     return(paste0(x[1]))
   }
   
   # When differing and our national status is native, it states as native
-  if(x[3]  == "According to the APC is native, while according to the GRIIS is introduced" || 
-     x[3]  == "According to the APC is native colonising, while according to the GRIIS is introduced" ||
-     x[3]  == "According to the APC is native colonising potential, while according to the GRIIS is introduced"|| 
-     x[3]  == "According to the APC is uncertain origin, while according to the GRIIS is introduced" ||
-     x[3]  == "According to the APC is presumed extinct, while according to the GRIIS is introduced" || 
-     x[3]  == "According to the APC is native, while according to the GRIIS is harmful invasive" || 
-     x[3]  == "According to the APC is native colonising, while according to the GRIIS is harmful invasive" ||
-     x[3]  == "According to the APC is native colonising potential, while according to GRIIS is harmful invasive"||
-     x[3]  == "According to the APC is presumed extinct, while according to the GRIIS is harmful invasive" || 
-     x[3]  == "According to the APC is uncertain origin, while according to the GRIIS is harmful invasive") {
+  if(x[3]  == "According to our national status is native, while according to the GRIIS is introduced" || 
+     x[3]  == "According to our national status is native colonising, while according to the GRIIS is introduced" ||
+     x[3]  == "According to our national status is native colonising potential, while according to the GRIIS is introduced"|| 
+     x[3]  == "According to our national status is uncertain origin, while according to the GRIIS is introduced" ||
+     x[3]  == "According to our national status is presumed extinct, while according to the GRIIS is introduced" || 
+     x[3]  == "According to our national status is native, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to our national status is native colonising, while according to the GRIIS is harmful invasive" ||
+     x[3]  == "According to our national status is native colonising potential, while according to GRIIS is harmful invasive"||
+     x[3]  == "According to our national status is presumed extinct, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to our national status is uncertain origin, while according to the GRIIS is harmful invasive") {
     return(paste0(x[1]))
   }
   
-  if(x[3]  == "According to the APC is naturalised, while according to the GRIIS is harmful invasive"|| 
-     x[3]  == "According to the APC is formerly naturalised, while according to the GRIIS is harmful invasive" || 
-     x[3]  == "According to the APC is introduced, while according to the GRIIS is harmful invasive" ||
-     x[3]  == "According to the APC is doubtfully naturalised, while according to the GRIIS is harmful invasive"|| 
-     x[3]  == "According to the APC is doubtfully introduced, while according to the GRIIS is harmful invasive"|| 
-     x[3]  == "According to the APC is formerly introduced, while according to the GRIIS is harmful invasive"|| 
-     x[3]  == "According to the APC is doubtfully introduced, while according to the GRIIS is introduced"|| 
-     x[3]  == "According to the APC is formerly introduced, while according to the GRIIS is introduced") {
+  if(x[3]  == "According to our national status is naturalised, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to our national status is formerly naturalised, while according to the GRIIS is harmful invasive" || 
+     x[3]  == "According to our national status is introduced, while according to the GRIIS is harmful invasive" ||
+     x[3]  == "According to our national status is doubtfully naturalised, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to our national status is doubtfully introduced, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to our national status is formerly introduced, while according to the GRIIS is harmful invasive"|| 
+     x[3]  == "According to our national status is doubtfully introduced, while according to the GRIIS is introduced"|| 
+     x[3]  == "According to our national status is formerly introduced, while according to the GRIIS is introduced") {
     return(paste0(x[2]))
   }
   # When differing but APC is most conservative
@@ -450,7 +450,7 @@ return_conservative_status_GRIIS <- function(x) { #where x will be a row of the 
 }
 
 national_establishment_means <- function(x) { #where x will be a row of the input df
-  # When NA in APC_Alien_Status --> write "Not listed in APC with the name appearing in the state flora or listed but not recorded as present in this state"
+  # When NA in APC_Alien_Status --> write "Not listed on the APC with the name appearing on the state flora"
   if(is.na(x[1])){
     return(NA)
   }
