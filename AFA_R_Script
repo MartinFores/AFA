@@ -12,7 +12,7 @@
 #####################
 #INTRUCTIONS
 #For static version:
-#1. Read the .csv files contained in the AFA_raw_data folder. They correspond to the raw data used to create the AFA dataset. Please, find the raw data for the Australian Plant Census (APC), the state an main territory plant censuses, and the three datasets conforming the Global Register of Introduced and Invasive Species (GRIIS).
+#1. Read the .csv files contained in the AFA_raw_data folder on Figshare (doi: 10.6084/m9.figshare.23513478). They correspond to the raw data used to create the AFA dataset. Please, find the raw data for the Australian Plant Census (APC), the state an main territory plant censuses, and the three datasets conforming the Global Register of Introduced and Invasive Species (GRIIS).
 #keep following the rest of the steps (2-8).
 
 #For dynamic and up-to-date versions:
