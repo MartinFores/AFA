@@ -11,6 +11,11 @@
 
 #####################
 #INTRUCTIONS
+#For static version:
+#1. Read the .csv files contained in the AFA_raw_data folder. They correspond to the raw data used to create the AFA dataset. Please, find the raw data for the Australian Plant Census (APC), the state an main territory plant censuses, and the three datasets conforming the Global Register of Introduced and Invasive Species (GRIIS).
+#keep following the rest of the steps (2-8).
+
+#For dynamic and up-to-date versions:
 #1. Download plant censuses from states and main territories, or request them to pertinent authorities:
 #Australian Plant Census (APC) = https://biodiversity.org.au/nsl/services/export/index
 
@@ -110,5 +115,5 @@ AFA_national_dataset <- national_alien_flora(APC_processed, AFA_ACT_state_datase
 #If reloading them again, fileEncoding must be set to the same specified for saving.
 
 ##############################
-#END SCRIPT 1 APPENDIX (INSTRUCTIONS) HERE
+#End of AFA_main_R_script
 #############################
